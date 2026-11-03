@@ -607,7 +607,7 @@ function publish(topic, msg){
   if (RELAY_MODE !== "ntfy") mqttPublish(topic, text);
 }
 /* ===== Relevo B: MQTT sobre WebSocket (broker público independiente) ===== */
-const MQTT_HOSTS = ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"];
+const MQTT_HOSTS = ["wss://mqtt.eclipseprojects.io:443/mqtt", "wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt", "wss://test.mosquitto.org:8081/mqtt"];
 let mqttWs = null, mqttUp = false, mqttHostIdx = 0, mqttPacketId = 1, mqttPingTimer = null, mqttRetry = null;
 const mqttTopics = new Set();
 function mqttEncodeStr(str){
@@ -637,6 +637,7 @@ function mqttConnect(){
   let ws;
   try { ws = new WebSocket(MQTT_HOSTS[mqttHostIdx % MQTT_HOSTS.length], ["mqtt"]); } catch(e){ scheduleMqttRetry(); return; }
   mqttWs = ws; ws.binaryType = "arraybuffer";
+  const connackTimer = setTimeout(() => { if (!mqttUp){ try { ws.close(); } catch(e){} } }, 8000);
   ws.onopen = () => {
     const proto = mqttEncodeStr("MQTT");
     const varHead = new Uint8Array(proto.length + 4);
@@ -654,6 +655,7 @@ function mqttConnect(){
     if (!data.length) return;
     const type = data[0] & 0xF0;
     if (type === 0x20){ // CONNACK
+      clearTimeout(connackTimer);
       if (data.length >= 4 && data[3] === 0){
         mqttUp = true; setConn(true);
         mqttTopics.forEach(t => mqttSendSubscribe(t));
@@ -671,7 +673,7 @@ function mqttConnect(){
       if (s) deliverText(s, new TextDecoder().decode(data.slice(idx)));
     }
   };
-  ws.onclose = () => { mqttUp = false; mqttWs = null; clearInterval(mqttPingTimer); scheduleMqttRetry(); };
+  ws.onclose = () => { clearTimeout(connackTimer); mqttUp = false; mqttWs = null; clearInterval(mqttPingTimer); scheduleMqttRetry(); };
   ws.onerror = () => { try { ws.close(); } catch(e){} };
 }
 function scheduleMqttRetry(){
