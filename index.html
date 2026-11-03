@@ -93,6 +93,8 @@
   .patname{font-size:19px; font-weight:900; color:var(--o); margin:0}
   .patnote{font-size:12px; color:var(--muted); margin:6px 0 0; line-height:1.35}
   select{width:100%; padding:11px; border-radius:10px; border:1px solid var(--line); background:#0b0b20; color:var(--txt); font-size:15px; font-weight:700; outline:none}
+  .modebtn.active{background:linear-gradient(90deg,#2257ff,#8a3ffc); color:#fff; border-color:transparent; box-shadow:0 6px 18px rgba(90,60,255,.35)}
+  .autorow{display:flex; align-items:center; gap:10px; margin-top:10px; font-size:14px; color:var(--muted)}
   .cell.pat{box-shadow:0 0 0 2px var(--o), 0 0 10px rgba(255,201,77,.45)}
   /* Cartón */
   .cardgrid{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px}
@@ -157,6 +159,18 @@
       <div class="bigball" id="hostBall"><span class="bl">—</span><span class="bn">?</span></div>
       <p class="ballword" id="hostWord">Todavía no sale ninguna bola</p>
       <button class="btn btn-main" id="btnDraw">🌀 Girar y sacar bola</button>
+      <div class="row" style="margin-top:10px">
+        <button class="btn btn-ghost modebtn active" id="btnModeManual">✋ Manual</button>
+        <button class="btn btn-ghost modebtn" id="btnModeAuto">🤖 Automático</button>
+      </div>
+      <div class="autorow" id="autoRow" style="display:none">
+        <label for="selSpeed" style="margin:0">Gira solo cada</label>
+        <select id="selSpeed" style="width:auto; flex:1">
+          <option value="4000">4 segundos (rápido)</option>
+          <option value="7000" selected>7 segundos (normal)</option>
+          <option value="10000">10 segundos (lento)</option>
+        </select>
+      </div>
       <p class="status" id="hostStatus"></p>
       <div class="patbox">
         <div>
@@ -529,7 +543,7 @@ function randSecret(){ const A = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; 
 
 let myName = "";
 /* ================= ANFITRIÓN ================= */
-const H = { active: false, code: "", secret: "", players: new Map(), drawn: [], drawnSet: new Set(), spinning: false, won: false, myCard: null, heartbeat: null, pattern: "linea" };
+const H = { active: false, code: "", secret: "", players: new Map(), drawn: [], drawnSet: new Set(), spinning: false, won: false, myCard: null, heartbeat: null, pattern: "linea", auto: false, autoTimer: null, autoDelay: 7000 };
 function hostNames(){ return Array.from(H.players.values()).map(p => p.name); }
 function hostBroadcastPlayers(){ publish(roomTopic(H.code, H.secret), { t: "players", from: "host", names: hostNames(), hostName: myName }); renderHostPlayers(); }
 function hostSendState(uid){
@@ -594,7 +608,10 @@ function renderHostAll(){
   renderHistInto($("hostHist"), H.drawn);
   $("hostCount").textContent = H.drawn.length + "/75";
   $("hostStatus").innerHTML = H.drawn.length ? ("Van <b>" + H.drawn.length + "</b> bolas · quedan <b>" + (75 - H.drawn.length) + "</b>") : "Cuando quieras, gira el biombo.";
-  $("btnDraw").disabled = H.spinning || H.drawn.length >= 75;
+  $("btnDraw").disabled = H.spinning || H.auto || H.drawn.length >= 75;
+  $("btnModeManual").classList.toggle("active", !H.auto);
+  $("btnModeAuto").classList.toggle("active", H.auto);
+  $("autoRow").style.display = H.auto ? "flex" : "none";
 }
 function hostDraw(){
   if (H.spinning || H.drawn.length >= 75) return;
@@ -608,13 +625,19 @@ function hostDraw(){
     publish(roomTopic(H.code, H.secret), { t: "draw", from: "host", n, drawn: H.drawn });
     spinCage("host", false); setBall("host", n); fantasySound(); renderHostAll();
     speak(letterOf(n) + ", " + numWord(n));
+    if (H.auto && !H.won && H.drawn.length < 75){
+      clearTimeout(H.autoTimer);
+      H.autoTimer = setTimeout(() => { if (H.auto && !H.won) hostDraw(); }, H.autoDelay);
+    }
   }, 2300);
 }
 function hostOnWinner(name, big, patternName){
+  if (H.auto) setAuto(false);
   winnerShow("🏆 ¡BINGO" + (big ? " MAYOR" : "") + " — " + escapeHtml(patternName || "Línea") + "! Ganó <b>" + escapeHtml(name) + "</b>");
   speak("¡Bingo! Ganó " + name); confetti(); renderHostAll();
 }
 function hostReset(){
+  if (H.auto) setAuto(false);
   H.drawn = []; H.drawnSet = new Set(); H.won = false; winnerHide();
   H.players.forEach((p, uid) => { p.card = genCard(); if (uid === myUid) H.myCard = p.card; else publish(userTopic(uid), { t: "newcard", card: p.card }); });
   publish(roomTopic(H.code, H.secret), { t: "reset", from: "host", pattern: H.pattern });
@@ -739,6 +762,20 @@ $("selPattern").addEventListener("change", () => {
   hostReset();
   $("hostStatus").innerHTML = "🎯 Forma de ganar: <b>" + PATTERNS[H.pattern].name + "</b>. Partida nueva para todos.";
 });
+function setAuto(on){
+  H.auto = on;
+  clearTimeout(H.autoTimer);
+  if (on && !H.won && H.drawn.length < 75 && !H.spinning){
+    H.autoTimer = setTimeout(() => { if (H.auto && !H.won) hostDraw(); }, 1200);
+  }
+  renderHostAll();
+  if (H.active) $("hostStatus").innerHTML = on
+    ? "🤖 Automático activado: el biombo gira solo. Toca «Manual» para detenerlo."
+    : "✋ Modo manual: gira el biombo con el botón.";
+}
+$("btnModeManual").addEventListener("click", () => setAuto(false));
+$("btnModeAuto").addEventListener("click", () => setAuto(true));
+$("selSpeed").addEventListener("change", () => { H.autoDelay = +$("selSpeed").value; });
 $("btnCreate").addEventListener("click", createRoom);
 $("btnJoin").addEventListener("click", joinRoom);
 $("btnDraw").addEventListener("click", hostDraw);

@@ -93,6 +93,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const patCellsOnCard = guest.document.querySelectorAll('#guestCard .cell.pat').length;
   check(patCellsOnCard === 4, 'las 4 esquinas se bordean en dorado en el cartón del invitado (' + patCellsOnCard + ')');
 
+
+  // --- Modo automático: gira solo dos veces y se detiene al pasar a manual ---
+  host.document.getElementById('selSpeed').value = '4000';
+  host.document.getElementById('selSpeed').dispatchEvent(new host.window.Event('change'));
+  host.document.getElementById('btnModeAuto').click();
+  await sleep(11500); // 1,2s arranque + giro 2,3s + espera 4s + giro 2,3s ≈ 2 bolas
+  check(guest.document.getElementById('guestCount').textContent === '2/75', 'AUTOMÁTICO: el invitado recibió 2 bolas sin tocar nada (va ' + guest.document.getElementById('guestCount').textContent + ')');
+  host.document.getElementById('btnModeManual').click();
+  await sleep(9000);
+  check(guest.document.getElementById('guestCount').textContent === '2/75', 'al pasar a MANUAL el automático se detiene (sigue ' + guest.document.getElementById('guestCount').textContent + ')');
+
   const fails = results.filter(r => !r).length;
   console.log(fails === 0 ? '\nSMOKE TODO OK' : '\nSMOKE CON ' + fails + ' FALLOS');
   process.exit(fails ? 1 : 0);
