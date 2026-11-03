@@ -143,7 +143,8 @@
   body.tv .logo{font-size:34px; margin:4px 0 0}
   body.tv .sub{display:none}
   body.tv #scrHost{display:grid; grid-template-columns:41% 1fr; gap:12px; align-items:start;
-    grid-template-areas:"code code" "cage players" "cage mine" "cage board" "actions actions"}
+    grid-template-areas:"code code" "cage board" "cage players" "actions actions"}
+  body.tv .card-mine{display:none}
   body.tv #scrHost .card{margin:0}
   body.tv .codebox{grid-area:code; display:flex; align-items:center; gap:26px; text-align:left; padding:10px 20px}
   body.tv .codebox .secttl{margin:0}
@@ -154,7 +155,6 @@
   body.tv .codebox .btn{width:auto; margin:0}
   body.tv .cage-zone{grid-area:cage}
   body.tv .card-players{grid-area:players}
-  body.tv .card-mine{grid-area:mine}
   body.tv .card-board{grid-area:board}
   body.tv .host-actions{grid-area:actions}
   body.tv .cageBox{width:min(500px,37vw)}
