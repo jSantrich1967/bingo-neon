@@ -17,6 +17,7 @@ try {
   const chA = A.channel(topic, { config: { broadcast: { self: false } } });
   chA.on('broadcast', { event: 'm' }, msg => {
     if (msg.payload && msg.payload.t === 'probe') say('✅ MENSAJE RECIBIDO por el otro cliente: ' + JSON.stringify(msg.payload));
+    if (msg.payload && msg.payload.t === 'probe-http') say('✅✅ MENSAJE HTTP RECIBIDO: ' + JSON.stringify(msg.payload));
   });
   chA.subscribe(st => {
     say('cliente receptor: ' + st);
@@ -31,7 +32,14 @@ try {
       });
     }
   });
-  setTimeout(() => say('⏱ fin de la ventana de prueba (12 s)'), 12000);
+  setTimeout(() => {
+    fetch(SBURL + '/realtime/v1/api/broadcast', {
+      method: 'POST',
+      headers: { 'apikey': SBKEY, 'Authorization': 'Bearer ' + SBKEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ topic: topic, event: 'm', payload: { t: 'probe-http', mid: 'sb-probe-http-1' } }] })
+    }).then(r => say('envío HTTP reportado: ' + r.status)).catch(e => say('envío HTTP falló: ' + e.message));
+  }, 5000);
+  setTimeout(() => say('⏱ fin de la ventana de prueba (14 s)'), 14000);
 } catch(e){ say('ERROR: ' + e.message); }
 </script>
 </body></html>

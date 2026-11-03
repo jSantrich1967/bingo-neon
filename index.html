@@ -839,9 +839,23 @@ function sbSendNow(topic, text){
 }
 function sbPublish(topic, text){
   const entry = sbChannel(topic);
-  if (!entry) return;
-  if (entry.joined) sbSendNow(topic, text);
-  else { entry.queue.push(text); if (entry.queue.length > 30) entry.queue.shift(); }
+  if (entry){
+    if (entry.joined) sbSendNow(topic, text);
+    else { entry.queue.push(text); if (entry.queue.length > 30) entry.queue.shift(); }
+  }
+  sbHttpBroadcast(topic, text);
+}
+/* Envío por HTTPS al API de Realtime: llega aunque el socket del teléfono esté dormido,
+   que es justo cuando un reclamo de bingo no puede esperar. */
+function sbHttpBroadcast(topic, text){
+  if (SB_KEY.indexOf("PENDIENTE") >= 0) return;
+  try {
+    fetch(SB_URL + "/realtime/v1/api/broadcast", {
+      method: "POST",
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ topic: topic, event: "m", payload: JSON.parse(text) }] })
+    }).catch(() => {});
+  } catch(e){}
 }
 /* ===== fin relevo privado ===== */
 const lobbyTopic = code => "bnv1-lobby-" + code;
@@ -890,7 +904,10 @@ function createRoom(){
       const w = checkPattern(p.card, H.drawnSet, H.pattern);
       if (w.win){
         H.won = true;
-        publish(roomTopic(H.code, H.secret), { t: "winner", from: "host", name: p.name, big: w.full, patternName: PATTERNS[H.pattern].name });
+        const winMsg = { t: "winner", from: "host", name: p.name, big: w.full, patternName: PATTERNS[H.pattern].name };
+        publish(roomTopic(H.code, H.secret), winMsg);
+        setTimeout(() => publish(roomTopic(H.code, H.secret), winMsg), 2500);
+        setTimeout(() => publish(roomTopic(H.code, H.secret), winMsg), 6000);
         hostOnWinner(p.name, w.full, PATTERNS[H.pattern].name);
       } else {
         publish(userTopic(msg.uid), { t: "bingoInvalid" });
@@ -996,7 +1013,7 @@ function hostClose(){
   setTimeout(() => location.href = location.origin + location.pathname, 400);
 }
 /* ================= INVITADO ================= */
-const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null, pattern: "linea", joinedAnnounced: false };
+const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null, pattern: "linea", joinedAnnounced: false, claimTimer: null, winnerSeen: false };
 function joinRoom(){
   ensureAudio();
   myName = $("inpName").value.trim();
@@ -1009,7 +1026,7 @@ function joinRoom(){
     if (msg.t === "invite" && msg.code === G.code && !G.secret){ G.secret = msg.secret; G.hostName = msg.hostName || ""; clearInterval(G.knockTimer); enterRoom(); }
     if (msg.t === "state"){ guestOnState(msg); }
     if (msg.t === "newcard"){ G.card = msg.card; renderGuestAll(); if (G.drawnSet.size) guestStatusHit(); }
-    if (msg.t === "bingoInvalid"){ $("bingoMsg").textContent = "Todavía no tienes línea completa. ¡Sigue jugando!"; speak("Todavía no"); }
+    if (msg.t === "bingoInvalid"){ clearInterval(G.claimTimer); $("bingoMsg").textContent = "Todavía no tienes línea completa. ¡Sigue jugando!"; speak("Todavía no"); }
   });
   if (pendingSecret){ G.secret = pendingSecret; enterRoom(); }
   else {
@@ -1070,12 +1087,16 @@ function guestOnRoom(msg){
     $("guestStatus").innerHTML = "🎯 Nueva forma de ganar: <b>" + PATTERNS[msg.pattern].name + "</b>. ¡Nueva partida!";
   }
   if (msg.t === "winner"){
+    if (G.winnerSeen) return;
+    G.winnerSeen = true;
+    clearInterval(G.claimTimer);
+    if (msg.name === myName) $("bingoMsg").textContent = "🏆 ¡Tu BINGO quedó confirmado!";
     winnerShow("🏆 ¡BINGO" + (msg.big ? " MAYOR" : "") + " — " + escapeHtml(msg.patternName || "Línea") + "! Ganó <b>" + escapeHtml(msg.name) + "</b>");
     celebrateBingo(msg.name, msg.big, msg.patternName);
   }
   if (msg.t === "reset"){
     if (msg.pattern && PATTERNS[msg.pattern]){ G.pattern = msg.pattern; guestShowPattern(); }
-    G.drawn = []; G.drawnSet = new Set(); winnerHide(); setBall("guest", null); renderGuestAll();
+    G.drawn = []; G.drawnSet = new Set(); G.winnerSeen = false; clearInterval(G.claimTimer); winnerHide(); setBall("guest", null); renderGuestAll();
     $("guestStatus").innerHTML = "🔄 Nueva partida: el anfitrión repartió cartones nuevos.";
     $("bingoMsg").textContent = "";
   }
@@ -1109,11 +1130,20 @@ function guestBingo(){
   if (!G.joined || !G.card) return;
   const w = checkPattern(G.card, G.drawnSet, G.pattern);
   if (!w.win){ $("bingoMsg").textContent = "Todavía no completas la forma: " + PATTERNS[G.pattern].name + ". ¡Sigue jugando!"; speak("Todavía no"); return; }
-  publish(roomTopic(G.code, G.secret), { t: "bingo", uid: myUid, name: myName });
+  const sendClaim = () => publish(roomTopic(G.code, G.secret), { t: "bingo", uid: myUid, name: myName });
+  sendClaim();
   $("bingoMsg").textContent = "Revisando tu bingo…";
+  clearInterval(G.claimTimer);
+  let tries = 0;
+  G.claimTimer = setInterval(() => {
+    tries++;
+    if (G.winnerSeen || tries > 9){ clearInterval(G.claimTimer); if (!G.winnerSeen && tries > 9) $("bingoMsg").textContent = "El anfitrión tardó en responder. Revisa tu conexión y pulsa ¡BINGO! otra vez."; return; }
+    sendClaim();
+  }, 3000);
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
+  try { if (sbClient && sbClient.realtime && !sbClient.realtime.isConnected()) sbClient.realtime.connect(); } catch(e){}
   if (H.active){ publish(roomTopic(H.code, H.secret), { t: "names", from: "host", names: hostNames() }); hostSendStateAll(); }
   if (G.code && G.secret && !G.joined) publish(roomTopic(G.code, G.secret), { t: "hello", uid: myUid, name: myName });
   else if (G.code && !G.secret) publish(lobbyTopic(G.code), { t: "knock", uid: myUid, name: myName });
