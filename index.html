@@ -138,6 +138,38 @@
   @keyframes fall{to{transform:translateY(105vh) rotate(720deg)}}
   .foot{text-align:center; color:#55587f; font-size:12px; margin-top:8px}
   @media (max-width:380px){ .cell{height:46px; font-size:19px} }
+  /* ===== Modo TV: parrilla horizontal para proyectar ===== */
+  body.tv .wrap{max-width:1560px; padding:8px 22px 20px}
+  body.tv .logo{font-size:34px; margin:4px 0 0}
+  body.tv .sub{display:none}
+  body.tv #scrHost{display:grid; grid-template-columns:41% 1fr; gap:12px; align-items:start;
+    grid-template-areas:"code code" "cage players" "cage mine" "cage board" "actions actions"}
+  body.tv #scrHost .card{margin:0}
+  body.tv .codebox{grid-area:code; display:flex; align-items:center; gap:26px; text-align:left; padding:10px 20px}
+  body.tv .codebox .secttl{margin:0}
+  body.tv .codebox .roomcode{font-size:56px; margin:0}
+  body.tv .codebox #qr{margin:0}
+  body.tv .codebox #qr canvas, body.tv .codebox #qr img{width:118px !important; height:118px !important}
+  body.tv .codebox #hostLink{display:none}
+  body.tv .codebox .btn{width:auto; margin:0}
+  body.tv .cage-zone{grid-area:cage}
+  body.tv .card-players{grid-area:players}
+  body.tv .card-mine{grid-area:mine}
+  body.tv .card-board{grid-area:board}
+  body.tv .host-actions{grid-area:actions}
+  body.tv .cageBox{width:min(500px,37vw)}
+  body.tv .stand{width:min(500px,37vw)}
+  body.tv .bigball{width:min(230px,20vw); height:min(230px,20vw)}
+  body.tv .ballword{font-size:31px}
+  body.tv .num{font-size:16px; padding:8px 0}
+  body.tv .bcol h4{font-size:19px}
+  body.tv .hball{width:52px; height:52px; font-size:16px}
+  body.tv .cell{height:62px; font-size:25px}
+  body.tv .players li{font-size:18px; padding:11px 14px}
+  body.tv .secttl{font-size:15px}
+  body.tv .cage-zone p.conn:not(#connHost){display:none}
+  body.tv #winnerBanner{position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:60;
+    font-size:32px; padding:20px 38px; width:max-content; max-width:92vw}
 </style>
 </head>
 <body>
@@ -170,6 +202,7 @@
       <div id="qr"></div>
       <p class="status" id="hostLink" style="word-break:break-all"></p>
       <button class="btn btn-ghost" id="btnCopy">📋 Copiar enlace de invitación</button>
+      <button class="btn btn-ghost" id="btnTV">📺 Modo TV (horizontal)</button>
     </div>
 
     <div class="card cage-zone">
@@ -209,24 +242,24 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card card-players">
       <p class="secttl">Jugadores (<span id="hostPCount">0</span>)</p>
       <ul class="players" id="hostPlayers"></ul>
     </div>
 
-    <div class="card">
+    <div class="card card-mine">
       <p class="secttl">Mi cartón</p>
       <div class="cardgrid" id="hostCard"></div>
     </div>
 
-    <div class="card">
+    <div class="card card-board">
       <p class="secttl">Tablero · <span id="hostCount">0/75</span></p>
       <div class="board" id="hostBoard"></div>
       <p class="secttl" style="margin-top:14px">Últimas bolas</p>
       <div class="hist" id="hostHist"><span style="color:var(--muted); font-size:14px">—</span></div>
     </div>
 
-    <div class="row">
+    <div class="row host-actions">
       <button class="btn btn-ghost" id="btnReset">🔄 Nueva partida</button>
       <button class="btn btn-danger" id="btnClose">Cerrar sala</button>
     </div>
@@ -866,6 +899,7 @@ function createRoom(){
     if (msg.t === "leave" && msg.uid){ if (H.players.delete(msg.uid)) hostBroadcastPlayers(); }
   });
   showScreen("scrHost"); keepAwake();
+  if (window.innerWidth >= 1000 && window.innerWidth > window.innerHeight) setTV(true);
   $("hostCode").textContent = H.code;
   const link = location.origin + location.pathname + "?sala=" + H.code + "&k=" + H.secret;
   $("hostLink").textContent = link;
@@ -1118,6 +1152,11 @@ $("btnReset").addEventListener("click", hostReset);
 $("btnClose").addEventListener("click", hostClose);
 $("btnBingo").addEventListener("click", guestBingo);
 $("btnLeave").addEventListener("click", guestLeave);
+function setTV(on){
+  document.body.classList.toggle("tv", on);
+  $("btnTV").textContent = on ? "📱 Salir del modo TV" : "📺 Modo TV (horizontal)";
+}
+$("btnTV").addEventListener("click", () => setTV(!document.body.classList.contains("tv")));
 $("btnCopy").addEventListener("click", () => {
   const link = $("hostLink").textContent;
   if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => { $("hostStatus").textContent = "Enlace copiado ✅ Compártelo por WhatsApp."; });
