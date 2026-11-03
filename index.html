@@ -249,7 +249,7 @@ function setBall(prefix, n){
   word.textContent = "¡" + L + " — " + n + ", " + numWord(n) + "!";
 }
 function spinCage(prefix, on){
-  const cage = $(prefix + "Cage");
+  const cage = $("cage" + prefix[0].toUpperCase() + prefix.slice(1));
   if (on){ renderCage(cage); cage.classList.add("spin"); $(prefix + "Word").textContent = "🌀 Girando el biombo…"; }
   else cage.classList.remove("spin");
 }
@@ -363,7 +363,7 @@ function createRoom(){
 function drawQR(link){
   $("qr").innerHTML = "<img alt='Código QR de invitación' width='180' height='180' style='background:#fff;padding:10px;border-radius:14px' src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(link) + "'>";
 }
-function renderHostPlayers(){ $("hostPlayers").innerHTML = playersHTML(hostNames(), myName); $("hostPlayersTitle").textContent = "JUGADORES (" + H.players.size + ")"; }
+function renderHostPlayers(){ $("hostPlayers").innerHTML = playersHTML(hostNames(), myName); $("hostPCount").textContent = H.players.size; }
 function renderHostAll(){
   renderHostPlayers();
   renderCardInto($("hostCard"), H.myCard, H.drawnSet, H.drawn[H.drawn.length-1]);
@@ -476,7 +476,7 @@ function guestStatusHit(){
 function renderGuestPlayers(names, hostName){
   if (!names) return;
   $("guestPlayers").innerHTML = playersHTML(names, hostName || G.hostName);
-  $("guestPlayersTitle").textContent = "JUGADORES (" + names.length + ")";
+  $("guestPCount").textContent = names.length;
 }
 function renderGuestAll(names){
   renderCardInto($("guestCard"), G.card, G.drawnSet, G.drawn[G.drawn.length-1]);
@@ -486,7 +486,9 @@ function renderGuestAll(names){
   if (names) renderGuestPlayers(names, G.hostName);
 }
 function guestBingo(){
-  if (!G.joined) return;
+  if (!G.joined || !G.card) return;
+  const w = checkWin(G.card, G.drawnSet);
+  if (!w.lines.length){ $("bingoMsg").textContent = "Todavía no tienes línea completa. ¡Sigue jugando!"; speak("Todavía no"); return; }
   publish(roomTopic(G.code, G.secret), { t: "bingo", uid: myUid, name: myName });
   $("bingoMsg").textContent = "Revisando tu bingo…";
 }
@@ -506,7 +508,7 @@ $("btnCopy").addEventListener("click", () => {
   const link = $("hostLink").textContent;
   if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => { $("hostStatus").textContent = "Enlace copiado ✅ Compártelo por WhatsApp."; });
 });
-renderCage($("hostCage")); renderCage($("guestCage"));
+renderCage($("cageHost")); renderCage($("cageGuest"));
 let pendingSecret = "";
 const params = new URLSearchParams(location.search);
 if (params.get("sala")){ $("inpCode").value = params.get("sala").toUpperCase(); pendingSecret = params.get("k") || ""; if (pendingSecret) $("homeStatus").textContent = "Tienes una invitación: escribe tu nombre y pulsa «Entrar con mi cartón»."; }
