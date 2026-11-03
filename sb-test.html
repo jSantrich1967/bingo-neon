@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Prueba Supabase Realtime</title></head>
+<body style="font-family:monospace; background:#111; color:#eee; padding:16px">
+<h3>Prueba de Broadcast de Supabase Realtime (dos clientes en esta página)</h3>
+<div id="log">conectando…</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
+<script>
+const log = document.getElementById('log');
+const lines = [];
+function say(s){ lines.push(s); log.innerHTML = lines.join('<br>'); }
+const URL = 'https://urhptjjafebeeakasoed.supabase.co';
+const KEY = 'sb_publishable_HW8-tEUvg6ueqeob1uALLA_GLqYhMIf';
+const topic = 'bnv1-sb-probe-' + Math.random().toString(36).slice(2, 8);
+try {
+  const A = window.supabase.createClient(URL, KEY);
+  const B = window.supabase.createClient(URL, KEY);
+  const chA = A.channel(topic, { config: { broadcast: { self: false } } });
+  chA.on('broadcast', { event: 'm' }, msg => {
+    if (msg.payload && msg.payload.t === 'probe') say('✅ MENSAJE RECIBIDO por el otro cliente: ' + JSON.stringify(msg.payload));
+  });
+  chA.subscribe(st => {
+    say('cliente receptor: ' + st);
+    if (st === 'SUBSCRIBED'){
+      const chB = B.channel(topic, { config: { broadcast: { self: false } } });
+      chB.subscribe(st2 => {
+        say('cliente emisor: ' + st2);
+        if (st2 === 'SUBSCRIBED'){
+          chB.send({ type: 'broadcast', event: 'm', payload: { t: 'probe', mid: 'sb-probe-1', desde: 'emisor' } })
+            .then(r => say('envío reportado: ' + r));
+        }
+      });
+    }
+  });
+  setTimeout(() => say('⏱ fin de la ventana de prueba (12 s)'), 12000);
+} catch(e){ say('ERROR: ' + e.message); }
+</script>
+</body></html>
