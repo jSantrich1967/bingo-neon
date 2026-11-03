@@ -71,8 +71,6 @@
   .mini .nb{background:radial-gradient(circle at 38% 32%, #ffffff, #dfe3ee 78%); color:#191930; border-radius:50%;
     width:64%; height:64%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:clamp(11px,3.6vw,19px);
     box-shadow:inset 0 -2px 4px rgba(0,0,0,.22), 0 1px 2px rgba(0,0,0,.3)}
-  .cage.spin .mini{animation:tumble .38s ease-in-out infinite alternate}
-  @keyframes tumble{from{transform:translate(-4px,-10px) rotate(-13deg)}to{transform:translate(5px,11px) rotate(15deg)}}
   .bigball{width:min(200px,54vw); height:min(200px,54vw); border-radius:50%; margin:14px auto 2px; display:flex; align-items:center; justify-content:center;
     background:#23233f; border:3px solid var(--line); color:var(--muted); transition:transform .15s;
     box-shadow:inset -12px -18px 30px rgba(0,0,0,.5), inset 8px 12px 22px rgba(255,255,255,.28), 0 14px 28px rgba(0,0,0,.55)}
@@ -466,39 +464,77 @@ function shade(hex, f){
 function ballBg(hex){
   return "radial-gradient(circle at 32% 26%, " + shade(hex, .75) + " 0%, " + shade(hex, .25) + " 30%, " + hex + " 58%, " + shade(hex, -.45) + " 100%)";
 }
+/* Física sencilla del biombo: gravedad, choques entre bolas y con la pared de la esfera.
+   En reposo las bolas caen y se apilan al fondo; al girar, una corriente las revuelca. */
+const cageSims = new Map();
+function stopCageSim(el){ const s = cageSims.get(el); if (s){ cancelAnimationFrame(s.raf); cageSims.delete(el); } }
 function renderCage(el, drawnSet){
+  stopCageSim(el);
   el.innerHTML = "";
   const balls = document.createElement("div"); balls.className = "balls";
   const remaining = [];
   for (let n = 1; n <= 75; n++) if (!drawnSet || !drawnSet.has(n)) remaining.push(n);
   for (let i = remaining.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); const t = remaining[i]; remaining[i] = remaining[j]; remaining[j] = t; }
   const SHOW = Math.min(remaining.length, 30);
-  const D = 13.5, R = D / 2, pitchX = D * 0.97, pitchY = D * 0.84, RC = 44.5;
-  let placed = 0, row = 0;
-  while (placed < SHOW && row < 8){
-    const cy = 98 - R - row * pitchY;
-    const dy = cy - 50;
-    const halfW = Math.sqrt(Math.max(0, RC * RC - dy * dy));
-    const cap = Math.max(1, Math.floor((2 * halfW) / pitchX));
-    const inRow = Math.min(cap, SHOW - placed);
-    const startX = 50 - (inRow - 1) * pitchX / 2 + (row % 2 ? pitchX * 0.24 : 0);
-    for (let k = 0; k < inRow; k++){
-      const num = remaining[placed];
-      const d = document.createElement("div"); d.className = "mini";
-      d.style.background = ballBg(BALL_COLORS[letterOf(num)]);
-      d.style.left = (startX + k * pitchX - R + (Math.random() - .5) * 1.5) + "%";
-      d.style.top = (cy - R + (Math.random() - .5) * 1.3) + "%";
-      d.style.animationDelay = (Math.random() * .35) + "s";
-      d.style.animationDuration = (.3 + Math.random() * .25) + "s";
-      d.innerHTML = "<span class='nb'>" + num + "</span>";
-      balls.appendChild(d);
-      placed++;
-    }
-    row++;
+  const sim = { balls: [], agitate: false, raf: 0, last: performance.now() };
+  const cols = 6, D = 13.5;
+  for (let i = 0; i < SHOW; i++){
+    const num = remaining[i];
+    const d = document.createElement("div"); d.className = "mini";
+    d.style.background = ballBg(BALL_COLORS[letterOf(num)]);
+    d.innerHTML = "<span class='nb'>" + num + "</span>";
+    balls.appendChild(d);
+    sim.balls.push({ n: num, el: d,
+      x: 22 + (i % cols) * 11 + (Math.random() - .5) * 5,
+      y: 10 + Math.floor(i / cols) * 12 + (Math.random() - .5) * 4,
+      vx: (Math.random() - .5) * 14, vy: Math.random() * 8 });
   }
   const bars = document.createElement("div"); bars.className = "bars";
   const shine = document.createElement("div"); shine.className = "shine";
   el.appendChild(balls); el.appendChild(bars); el.appendChild(shine);
+  cageSims.set(el, sim);
+  const R = 6.75, RLIM = 43.2, GRAV = 300, REST = 0.42;
+  function step(now){
+    if (cageSims.get(el) !== sim) return;
+    let dt = Math.min(0.033, (now - sim.last) / 1000 || 0.016); sim.last = now;
+    const sub = 2, h = dt / sub;
+    for (let s = 0; s < sub; s++){
+      for (const b of sim.balls){
+        b.vy += GRAV * h;
+        if (sim.agitate){
+          const dx = b.x - 50, dy = b.y - 50, len = Math.max(8, Math.hypot(dx, dy));
+          const swirl = 175; // la pared que gira arrastra las bolas en redondo y caen en cascada
+          b.vx += (-dy / len) * swirl * h; b.vy += (dx / len) * swirl * h;
+          if (Math.random() < 0.03) b.vy -= 90 + Math.random() * 130;
+          if (Math.random() < 0.02) b.vx += (Math.random() - .5) * 160;
+        }
+        const drag = sim.agitate ? 0.25 : 0.55;
+        b.vx -= b.vx * drag * h; b.vy -= b.vy * (sim.agitate ? 0.1 : 0.3) * h;
+        b.x += b.vx * h; b.y += b.vy * h;
+        const dx = b.x - 50, dy = b.y - 50, dist = Math.hypot(dx, dy);
+        if (dist > RLIM){
+          const nx = dx / dist, ny = dy / dist;
+          b.x = 50 + nx * RLIM; b.y = 50 + ny * RLIM;
+          const vn = b.vx * nx + b.vy * ny;
+          if (vn > 0){ b.vx -= (1 + REST) * vn * nx; b.vy -= (1 + REST) * vn * ny; b.vx *= 0.96; b.vy *= 0.96; }
+        }
+      }
+      for (let i = 0; i < sim.balls.length; i++) for (let j = i + 1; j < sim.balls.length; j++){
+        const a = sim.balls[i], c = sim.balls[j];
+        let dx = c.x - a.x, dy = c.y - a.y; let d2 = dx * dx + dy * dy; const min = D * 0.98;
+        if (d2 > 0.01 && d2 < min * min){
+          const dist = Math.sqrt(d2), nx = dx / dist, ny = dy / dist, overlap = (min - dist) / 2;
+          a.x -= nx * overlap; a.y -= ny * overlap; c.x += nx * overlap; c.y += ny * overlap;
+          const rvx = c.vx - a.vx, rvy = c.vy - a.vy, vn = rvx * nx + rvy * ny;
+          if (vn < 0){ const imp = -(1 + 0.45) * vn / 2; a.vx -= imp * nx; a.vy -= imp * ny; c.vx += imp * nx; c.vy += imp * ny; }
+        }
+      }
+    }
+    if (!sim.agitate) for (const b of sim.balls){ if (Math.hypot(b.vx, b.vy) < 2.2){ b.vx *= 0.82; b.vy *= 0.82; } }
+    for (const b of sim.balls){ b.el.style.left = (b.x - R) + "%"; b.el.style.top = (b.y - R) + "%"; }
+    sim.raf = requestAnimationFrame(step);
+  }
+  sim.raf = requestAnimationFrame(step);
 }
 function renderBoardInto(el, drawnSet){ el.innerHTML = ""; LETTERS.forEach((L, ci) => { const col = document.createElement("div"); col.className = "bcol"; col.innerHTML = "<h4 style='color:" + BALL_COLORS[L] + "'>" + L + "</h4>"; const nums = document.createElement("div"); nums.className = "nums"; for (let n = ci*15+1; n <= ci*15+15; n++){ const s = document.createElement("span"); s.className = "num" + (drawnSet.has(n) ? " on" : ""); if (drawnSet.has(n)) s.style.background = BALL_COLORS[L]; s.textContent = n; nums.appendChild(s); } col.appendChild(nums); el.appendChild(col); }); }
 function renderCardInto(el, card, drawnSet, latest, patternKey){
@@ -532,8 +568,15 @@ function setBall(prefix, n){
 function spinCage(prefix, on){
   const cage = $("cage" + prefix[0].toUpperCase() + prefix.slice(1));
   const set = prefix === "host" ? H.drawnSet : G.drawnSet;
-  if (on){ renderCage(cage, set); cage.classList.add("spin"); $(prefix + "Word").textContent = "🌀 Girando el biombo…"; }
-  else { cage.classList.remove("spin"); renderCage(cage, set); }
+  let sim = cageSims.get(cage);
+  if (!sim){ renderCage(cage, set); sim = cageSims.get(cage); }
+  if (on){ if (sim) sim.agitate = true; cage.classList.add("spin"); $(prefix + "Word").textContent = "🌀 Girando el biombo…"; }
+  else {
+    cage.classList.remove("spin");
+    if (sim){ sim.agitate = false;
+      sim.balls = sim.balls.filter(b => { const gone = set.has(b.n); if (gone) b.el.remove(); return !gone; });
+    }
+  }
 }
 function confetti(){
   const colors = ["#ff4d6d","#c77dff","#4dd2ff","#52ffa8","#ffc94d"];
@@ -824,6 +867,7 @@ function hostOnWinner(name, big, patternName){
   speak("¡Bingo! Ganó " + name); confetti(); renderHostAll();
 }
 function hostReset(){
+  renderCage($("cageHost"), new Set());
   if (H.auto) setAuto(false);
   H.announced = false;
   H.drawn = []; H.drawnSet = new Set(); H.won = false; winnerHide();
