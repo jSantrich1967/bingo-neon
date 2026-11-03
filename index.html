@@ -372,6 +372,44 @@ function ballThunk(){
     o.connect(g); g.connect(masterGain); o.start(t); o.stop(t + 0.19);
   } catch(e){}
 }
+/* Sonido de fantasía al salir la bola: arpegio de arpa ascendente + destellos */
+function toneAt(freq, t, dur, vol, type){
+  const o = AC.createOscillator(); o.type = type || "sine"; o.frequency.value = freq;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(masterGain); o.start(t); o.stop(t + dur + 0.05);
+}
+function fantasySound(){
+  if (!ensureAudio()) return;
+  try {
+    const t0 = AC.currentTime + 0.01;
+    // golpecito suave de la bola al caer
+    const o = AC.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(180, t0);
+    o.frequency.exponentialRampToValueAtTime(70, t0 + 0.1);
+    const og = AC.createGain();
+    og.gain.setValueAtTime(0.22, t0);
+    og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
+    o.connect(og); og.connect(masterGain); o.start(t0); o.stop(t0 + 0.16);
+    // arpegio mágico ascendente (escala mayor brillante, tipo arpa de cuento)
+    const scale = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98, 2093.00];
+    scale.forEach((f, i) => {
+      toneAt(f, t0 + 0.05 + i * 0.055, 0.85, 0.20, "triangle");
+      toneAt(f * 2, t0 + 0.05 + i * 0.055, 0.4, 0.05, "sine");
+    });
+    // destellos de polvo de hadas
+    for (let i = 0; i < 11; i++){
+      const tt = t0 + 0.15 + Math.random() * 0.75;
+      toneAt(2300 + Math.random() * 2900, tt, 0.28, 0.055 + Math.random() * 0.05, "sine");
+    }
+    // resplandor final que se desvanece
+    toneAt(1318.51, t0 + 0.42, 1.25, 0.07, "sine");
+    toneAt(1975.53, t0 + 0.46, 1.15, 0.05, "sine");
+    toneAt(2637.02, t0 + 0.50, 1.0, 0.035, "sine");
+  } catch(e){}
+}
 /* ---------- renders compartidos ---------- */
 function shade(hex, f){
   const n = parseInt(hex.slice(1), 16);
@@ -568,7 +606,7 @@ function hostDraw(){
     const n = rest[Math.floor(Math.random()*rest.length)];
     H.drawn.push(n); H.drawnSet.add(n); H.spinning = false;
     publish(roomTopic(H.code, H.secret), { t: "draw", from: "host", n, drawn: H.drawn });
-    spinCage("host", false); setBall("host", n); ballThunk(); renderHostAll();
+    spinCage("host", false); setBall("host", n); fantasySound(); renderHostAll();
     speak(letterOf(n) + ", " + numWord(n));
   }, 2300);
 }
@@ -635,7 +673,7 @@ function guestOnState(msg){
 function guestOnRoom(msg){
   if (msg.t === "spin"){ spinCage("guest", true); spinSound(2300); }
   if (msg.t === "draw"){
-    spinCage("guest", false); ballThunk();
+    spinCage("guest", false); fantasySound();
     G.drawn = Array.isArray(msg.drawn) && msg.drawn.length >= G.drawn.length ? msg.drawn : G.drawn.concat(msg.n);
     G.drawnSet = new Set(G.drawn);
     setBall("guest", msg.n); renderGuestAll(); speak(letterOf(msg.n) + ", " + numWord(msg.n));
