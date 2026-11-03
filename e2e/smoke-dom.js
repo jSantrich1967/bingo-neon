@@ -78,6 +78,21 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(300);
   check(guest.document.getElementById('bingoMsg').textContent.includes('Todavía no'), 'bingo sin línea rechazado al instante en el propio teléfono');
 
+
+  // --- Formas de ganar: el anfitrión cambia a Cuatro esquinas ---
+  const sel = host.document.getElementById('selPattern');
+  sel.value = 'esquinas';
+  sel.dispatchEvent(new host.window.Event('change'));
+  await sleep(900);
+  check(guest.document.getElementById('guestPatternName').textContent === 'Cuatro esquinas', 'el invitado ve la nueva forma: Cuatro esquinas');
+  const patOn = guest.document.querySelectorAll('#guestPatternGrid .patcell.on').length;
+  check(patOn === 4, 'el diagrama del invitado marca las 4 esquinas (' + patOn + ')');
+  const patHost = host.document.querySelectorAll('#hostPatternGrid .patcell.on').length;
+  check(patHost === 4, 'el diagrama del anfitrión marca las 4 esquinas');
+  check(guest.document.getElementById('guestCount').textContent === '0/75', 'cambiar la forma reinicia la partida del invitado');
+  const patCellsOnCard = guest.document.querySelectorAll('#guestCard .cell.pat').length;
+  check(patCellsOnCard === 4, 'las 4 esquinas se bordean en dorado en el cartón del invitado (' + patCellsOnCard + ')');
+
   const fails = results.filter(r => !r).length;
   console.log(fails === 0 ? '\nSMOKE TODO OK' : '\nSMOKE CON ' + fails + ' FALLOS');
   process.exit(fails ? 1 : 0);

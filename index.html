@@ -84,6 +84,16 @@
   .bigball .bl{font-size:24px; font-weight:900; letter-spacing:4px; line-height:1}
   .bigball .bn{font-size:66px; font-weight:900; line-height:1.02}
   .ballword{text-align:center; font-size:17px; color:var(--txt); min-height:24px; margin:4px 0 0; font-weight:600}
+  /* Formas de ganar */
+  .patbox{display:flex; gap:16px; align-items:center; width:100%; margin-top:14px; padding:12px; background:#0d0d24; border:1px solid var(--line); border-radius:14px}
+  .patbox > div:first-child{flex:1; text-align:left}
+  .patgrid{display:grid; grid-template-columns:repeat(5,1fr); gap:3px; width:92px; flex:none}
+  .patcell{aspect-ratio:1; border-radius:3px; background:#141432; border:1px solid #26265a}
+  .patcell.on{background:var(--o); border-color:var(--o); box-shadow:0 0 7px rgba(255,201,77,.65)}
+  .patname{font-size:19px; font-weight:900; color:var(--o); margin:0}
+  .patnote{font-size:12px; color:var(--muted); margin:6px 0 0; line-height:1.35}
+  select{width:100%; padding:11px; border-radius:10px; border:1px solid var(--line); background:#0b0b20; color:var(--txt); font-size:15px; font-weight:700; outline:none}
+  .cell.pat{box-shadow:0 0 0 2px var(--o), 0 0 10px rgba(255,201,77,.45)}
   /* Cartón */
   .cardgrid{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px}
   .chead,.cell{border-radius:10px; display:flex; align-items:center; justify-content:center; font-weight:900}
@@ -148,6 +158,20 @@
       <p class="ballword" id="hostWord">Todavía no sale ninguna bola</p>
       <button class="btn btn-main" id="btnDraw">🌀 Girar y sacar bola</button>
       <p class="status" id="hostStatus"></p>
+      <div class="patbox">
+        <div>
+          <p class="secttl" style="margin:0 0 6px">Forma de ganar</p>
+          <select id="selPattern">
+            <option value="linea">Línea (fila, columna o diagonal)</option>
+            <option value="ele">Letra L</option>
+            <option value="esquinas">Cuatro esquinas</option>
+            <option value="cruz">Cruz</option>
+            <option value="lleno">Cartón lleno</option>
+          </select>
+          <p class="patnote">Cambiar la forma empieza una partida nueva con cartones nuevos para todos.</p>
+        </div>
+        <div class="patgrid" id="hostPatternGrid"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -181,6 +205,14 @@
       <div class="bigball" id="guestBall"><span class="bl">—</span><span class="bn">?</span></div>
       <p class="ballword" id="guestWord">Esperando que el anfitrión gire el biombo…</p>
       <p class="status" id="guestStatus"></p>
+      <div class="patbox">
+        <div>
+          <p class="secttl" style="margin:0 0 6px">Se gana con</p>
+          <p class="patname" id="guestPatternName">Línea</p>
+          <p class="patnote">Las casillas de la forma se marcan con borde dorado en tu cartón.</p>
+        </div>
+        <div class="patgrid" id="guestPatternGrid"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -228,6 +260,40 @@ function checkWin(card, drawnSet){
   let full = true; for (let c = 0; c < 5 && full; c++) for (let r = 0; r < 5; r++) if (!hit(c, r)) { full = false; break; }
   return { lines, full };
 }
+/* ---------- formas de ganar ---------- */
+const PATTERNS = {
+  linea:    { name: "Línea", cells: null },
+  ele:      { name: "Letra L", cells: [[0,0],[0,1],[0,2],[0,3],[0,4],[1,4],[2,4],[3,4],[4,4]] },
+  esquinas: { name: "Cuatro esquinas", cells: [[0,0],[4,0],[0,4],[4,4]] },
+  cruz:     { name: "Cruz", cells: [[2,0],[2,1],[2,2],[2,3],[2,4],[0,2],[1,2],[3,2],[4,2]] },
+  lleno:    { name: "Cartón lleno", cells: (() => { const a = []; for (let c = 0; c < 5; c++) for (let r = 0; r < 5; r++) a.push([c, r]); return a; })() }
+};
+function patternCellsForDiagram(key){
+  if (key === "linea") return [[0,2],[1,2],[2,2],[3,2],[4,2]];
+  return PATTERNS[key] ? PATTERNS[key].cells : [];
+}
+function renderPatternGrid(el, key){
+  if (!el) return;
+  const on = new Set(patternCellsForDiagram(key).map(([c, r]) => c + "-" + r));
+  el.innerHTML = "";
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++){
+    const d = document.createElement("div");
+    d.className = "patcell" + (on.has(c + "-" + r) ? " on" : "");
+    el.appendChild(d);
+  }
+}
+function checkPattern(card, drawnSet, key){
+  const hit = (c, r) => card[c][r] === 0 || drawnSet.has(card[c][r]);
+  if (!key || key === "linea" || !PATTERNS[key]){
+    const w = checkWin(card, drawnSet);
+    const cells = [];
+    w.lines.forEach(([type, idx]) => { for (let i = 0; i < 5; i++){ if (type === "row") cells.push([i, idx]); if (type === "col") cells.push([idx, i]); if (type === "diag" && idx === 0) cells.push([i, i]); if (type === "diag" && idx === 1) cells.push([i, 4 - i]); } });
+    return { win: w.lines.length > 0, cells, full: w.full };
+  }
+  const cells = PATTERNS[key].cells;
+  const win = cells.every(([c, r]) => hit(c, r));
+  return { win, cells: win ? cells : [], full: key === "lleno" && win };
+}
 /* ---------- voz ---------- */
 function speak(text){
   try {
@@ -269,15 +335,20 @@ function renderCage(el){
   el.appendChild(balls); el.appendChild(bars); el.appendChild(shine);
 }
 function renderBoardInto(el, drawnSet){ el.innerHTML = ""; LETTERS.forEach((L, ci) => { const col = document.createElement("div"); col.className = "bcol"; col.innerHTML = "<h4 style='color:" + BALL_COLORS[L] + "'>" + L + "</h4>"; const nums = document.createElement("div"); nums.className = "nums"; for (let n = ci*15+1; n <= ci*15+15; n++){ const s = document.createElement("span"); s.className = "num" + (drawnSet.has(n) ? " on" : ""); if (drawnSet.has(n)) s.style.background = BALL_COLORS[L]; s.textContent = n; nums.appendChild(s); } col.appendChild(nums); el.appendChild(col); }); }
-function renderCardInto(el, card, drawnSet, latest){
+function renderCardInto(el, card, drawnSet, latest, patternKey){
   el.innerHTML = "";
   LETTERS.forEach(L => { const h = document.createElement("div"); h.className = "chead"; h.style.background = BALL_COLORS[L]; h.textContent = L; el.appendChild(h); });
-  let winCells = new Set();
-  if (card){ const w = checkWin(card, drawnSet); w.lines.forEach(([type, idx]) => { for (let i = 0; i < 5; i++){ if (type === "row") winCells.add(i + "-" + idx); if (type === "col") winCells.add(idx + "-" + i); if (type === "diag" && idx === 0) winCells.add(i + "-" + i); if (type === "diag" && idx === 1) winCells.add(i + "-" + (4-i)); } }); }
+  let winCells = new Set(), patCells = new Set();
+  if (card){
+    const w = checkPattern(card, drawnSet, patternKey || "linea");
+    w.cells.forEach(([c, r]) => winCells.add(c + "-" + r));
+    if (patternKey && PATTERNS[patternKey] && PATTERNS[patternKey].cells) PATTERNS[patternKey].cells.forEach(([c, r]) => patCells.add(c + "-" + r));
+  }
   for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++){
     const d = document.createElement("div"); const val = card ? card[c][r] : null;
     if (val === 0){ d.className = "cell free"; d.textContent = "★ LIBRE"; }
     else { d.className = "cell" + (val !== null && drawnSet.has(val) ? " hit" : "") + (val === latest ? " latest" : ""); d.textContent = val === null ? "·" : val; }
+    if (patCells.has(c + "-" + r)) d.classList.add("pat");
     if (winCells.has(c + "-" + r)) d.classList.add("winline");
     el.appendChild(d);
   }
@@ -353,12 +424,12 @@ function randSecret(){ const A = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; 
 
 let myName = "";
 /* ================= ANFITRIÓN ================= */
-const H = { active: false, code: "", secret: "", players: new Map(), drawn: [], drawnSet: new Set(), spinning: false, won: false, myCard: null, heartbeat: null };
+const H = { active: false, code: "", secret: "", players: new Map(), drawn: [], drawnSet: new Set(), spinning: false, won: false, myCard: null, heartbeat: null, pattern: "linea" };
 function hostNames(){ return Array.from(H.players.values()).map(p => p.name); }
 function hostBroadcastPlayers(){ publish(roomTopic(H.code, H.secret), { t: "players", from: "host", names: hostNames(), hostName: myName }); renderHostPlayers(); }
 function hostSendState(uid){
   const p = H.players.get(uid); if (!p) return;
-  publish(userTopic(uid), { t: "state", card: p.card, drawn: H.drawn, hostName: myName, code: H.code, names: hostNames() });
+  publish(userTopic(uid), { t: "state", card: p.card, drawn: H.drawn, hostName: myName, code: H.code, names: hostNames(), pattern: H.pattern });
 }
 function createRoom(){
   myName = $("inpName").value.trim();
@@ -382,11 +453,11 @@ function createRoom(){
     }
     if (msg.t === "bingo" && msg.uid){
       const p = H.players.get(msg.uid); if (!p || H.won) return;
-      const w = checkWin(p.card, H.drawnSet);
-      if (w.lines.length && H.drawn.length >= 5){
+      const w = checkPattern(p.card, H.drawnSet, H.pattern);
+      if (w.win){
         H.won = true;
-        publish(roomTopic(H.code, H.secret), { t: "winner", from: "host", name: p.name, big: w.full });
-        hostOnWinner(p.name, w.full);
+        publish(roomTopic(H.code, H.secret), { t: "winner", from: "host", name: p.name, big: w.full, patternName: PATTERNS[H.pattern].name });
+        hostOnWinner(p.name, w.full, PATTERNS[H.pattern].name);
       } else {
         publish(userTopic(msg.uid), { t: "bingoInvalid" });
       }
@@ -410,7 +481,9 @@ function drawQR(link){
 function renderHostPlayers(){ $("hostPlayers").innerHTML = playersHTML(hostNames(), myName); $("hostPCount").textContent = H.players.size; }
 function renderHostAll(){
   renderHostPlayers();
-  renderCardInto($("hostCard"), H.myCard, H.drawnSet, H.drawn[H.drawn.length-1]);
+  renderCardInto($("hostCard"), H.myCard, H.drawnSet, H.drawn[H.drawn.length-1], H.pattern);
+  renderPatternGrid($("hostPatternGrid"), H.pattern);
+  if ($("selPattern").value !== H.pattern) $("selPattern").value = H.pattern;
   renderBoardInto($("hostBoard"), H.drawnSet);
   renderHistInto($("hostHist"), H.drawn);
   $("hostCount").textContent = H.drawn.length + "/75";
@@ -431,14 +504,14 @@ function hostDraw(){
     speak(letterOf(n) + ", " + numWord(n));
   }, 2300);
 }
-function hostOnWinner(name, big){
-  winnerShow("🏆 ¡BINGO" + (big ? " MAYOR" : "") + "! Ganó <b>" + escapeHtml(name) + "</b>");
+function hostOnWinner(name, big, patternName){
+  winnerShow("🏆 ¡BINGO" + (big ? " MAYOR" : "") + " — " + escapeHtml(patternName || "Línea") + "! Ganó <b>" + escapeHtml(name) + "</b>");
   speak("¡Bingo! Ganó " + name); confetti(); renderHostAll();
 }
 function hostReset(){
   H.drawn = []; H.drawnSet = new Set(); H.won = false; winnerHide();
   H.players.forEach((p, uid) => { p.card = genCard(); if (uid === myUid) H.myCard = p.card; else publish(userTopic(uid), { t: "newcard", card: p.card }); });
-  publish(roomTopic(H.code, H.secret), { t: "reset", from: "host" });
+  publish(roomTopic(H.code, H.secret), { t: "reset", from: "host", pattern: H.pattern });
   setBall("host", null); renderHostAll();
 }
 function hostClose(){
@@ -447,7 +520,7 @@ function hostClose(){
   setTimeout(() => location.href = location.origin + location.pathname, 400);
 }
 /* ================= INVITADO ================= */
-const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null };
+const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null, pattern: "linea" };
 function joinRoom(){
   myName = $("inpName").value.trim();
   const code = $("inpCode").value.trim().toUpperCase();
@@ -478,10 +551,12 @@ function enterRoom(){
 }
 function guestOnState(msg){
   G.card = msg.card; G.hostName = msg.hostName || G.hostName;
+  if (msg.pattern && PATTERNS[msg.pattern]){ G.pattern = msg.pattern; guestShowPattern(); }
   G.drawn = msg.drawn || []; G.drawnSet = new Set(G.drawn);
   G.joined = true; clearTimeout(G.joinTimeout); clearInterval(G.helloTimer); clearInterval(G.knockTimer);
   $("guestCode").textContent = G.code;
   $("guestHost").textContent = G.hostName;
+  $("guestNameLbl").textContent = myName;
   showScreen("scrGuest");
   setBall("guest", G.drawn.length ? G.drawn[G.drawn.length-1] : null);
   renderGuestAll(msg.names);
@@ -498,11 +573,16 @@ function guestOnRoom(msg){
     guestStatusHit();
   }
   if (msg.t === "players"){ renderGuestPlayers(msg.names, msg.hostName); }
+  if (msg.t === "pattern" && PATTERNS[msg.pattern]){
+    G.pattern = msg.pattern; guestShowPattern();
+    $("guestStatus").innerHTML = "🎯 Nueva forma de ganar: <b>" + PATTERNS[msg.pattern].name + "</b>. ¡Nueva partida!";
+  }
   if (msg.t === "winner"){
-    winnerShow("🏆 ¡BINGO" + (msg.big ? " MAYOR" : "") + "! Ganó <b>" + escapeHtml(msg.name) + "</b>");
+    winnerShow("🏆 ¡BINGO" + (msg.big ? " MAYOR" : "") + " — " + escapeHtml(msg.patternName || "Línea") + "! Ganó <b>" + escapeHtml(msg.name) + "</b>");
     speak("¡Bingo! Ganó " + msg.name); confetti();
   }
   if (msg.t === "reset"){
+    if (msg.pattern && PATTERNS[msg.pattern]){ G.pattern = msg.pattern; guestShowPattern(); }
     G.drawn = []; G.drawnSet = new Set(); winnerHide(); setBall("guest", null); renderGuestAll();
     $("guestStatus").innerHTML = "🔄 Nueva partida: el anfitrión repartió cartones nuevos.";
     $("bingoMsg").textContent = "";
@@ -522,8 +602,12 @@ function renderGuestPlayers(names, hostName){
   $("guestPlayers").innerHTML = playersHTML(names, hostName || G.hostName);
   $("guestPCount").textContent = names.length;
 }
+function guestShowPattern(){
+  $("guestPatternName").textContent = PATTERNS[G.pattern].name;
+  renderPatternGrid($("guestPatternGrid"), G.pattern);
+}
 function renderGuestAll(names){
-  renderCardInto($("guestCard"), G.card, G.drawnSet, G.drawn[G.drawn.length-1]);
+  renderCardInto($("guestCard"), G.card, G.drawnSet, G.drawn[G.drawn.length-1], G.pattern);
   renderBoardInto($("guestBoard"), G.drawnSet);
   renderHistInto($("guestHist"), G.drawn);
   $("guestCount").textContent = G.drawn.length + "/75";
@@ -531,8 +615,8 @@ function renderGuestAll(names){
 }
 function guestBingo(){
   if (!G.joined || !G.card) return;
-  const w = checkWin(G.card, G.drawnSet);
-  if (!w.lines.length){ $("bingoMsg").textContent = "Todavía no tienes línea completa. ¡Sigue jugando!"; speak("Todavía no"); return; }
+  const w = checkPattern(G.card, G.drawnSet, G.pattern);
+  if (!w.win){ $("bingoMsg").textContent = "Todavía no completas la forma: " + PATTERNS[G.pattern].name + ". ¡Sigue jugando!"; speak("Todavía no"); return; }
   publish(roomTopic(G.code, G.secret), { t: "bingo", uid: myUid, name: myName });
   $("bingoMsg").textContent = "Revisando tu bingo…";
 }
@@ -541,6 +625,13 @@ function guestLeave(){
   setTimeout(() => location.href = location.origin + location.pathname, 300);
 }
 /* ---------- botones y arranque ---------- */
+$("selPattern").addEventListener("change", () => {
+  if (!H.active) { H.pattern = $("selPattern").value; renderPatternGrid($("hostPatternGrid"), H.pattern); return; }
+  H.pattern = $("selPattern").value;
+  publish(roomTopic(H.code, H.secret), { t: "pattern", from: "host", pattern: H.pattern });
+  hostReset();
+  $("hostStatus").innerHTML = "🎯 Forma de ganar: <b>" + PATTERNS[H.pattern].name + "</b>. Partida nueva para todos.";
+});
 $("btnCreate").addEventListener("click", createRoom);
 $("btnJoin").addEventListener("click", joinRoom);
 $("btnDraw").addEventListener("click", hostDraw);
@@ -553,6 +644,7 @@ $("btnCopy").addEventListener("click", () => {
   if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => { $("hostStatus").textContent = "Enlace copiado ✅ Compártelo por WhatsApp."; });
 });
 renderCage($("cageHost")); renderCage($("cageGuest"));
+renderPatternGrid($("hostPatternGrid"), "linea"); renderPatternGrid($("guestPatternGrid"), "linea");
 let pendingSecret = "";
 const params = new URLSearchParams(location.search);
 if (params.get("sala")){ $("inpCode").value = params.get("sala").toUpperCase(); pendingSecret = params.get("k") || ""; if (pendingSecret) $("homeStatus").textContent = "Tienes una invitación: escribe tu nombre y pulsa «Entrar con mi cartón»."; }
