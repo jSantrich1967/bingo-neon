@@ -189,390 +189,327 @@
   </section>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
 "use strict";
-/* ============ Utilidades de bingo ============ */
+const $ = id => document.getElementById(id);
 const LETTERS = ["B","I","N","G","O"];
-const COLORS  = {B:"#ff4d6d", I:"#c77dff", N:"#4dd2ff", G:"#52ffa8", O:"#ffc94d"};
-const PREFIX  = "bingoneon-v1-";
-const UNITS = ["","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez","once","doce","trece","catorce","quince","dieciséis","diecisiete","dieciocho","diecinueve","veinte","veintiuno","veintidós","veintitrés","veinticuatro","veinticinco","veintiséis","veintisiete","veintiocho","veintinueve"];
-function numWord(n){
-  if (n < 30) return UNITS[n];
-  const tens = {3:"treinta",4:"cuarenta",5:"cincuenta",6:"sesenta",7:"setenta"}[Math.floor(n/10)];
-  const u = n % 10; return u === 0 ? tens : tens + " y " + UNITS[u];
-}
+const BALL_COLORS = { B:"#ff4d6d", I:"#c77dff", N:"#4dd2ff", G:"#2bd98a", O:"#ffc94d" };
+const SMALL = ["cero","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez","once","doce","trece","catorce","quince","dieciséis","diecisiete","dieciocho","diecinueve","veinte","veintiuno","veintidós","veintitrés","veinticuatro","veinticinco","veintiséis","veintisiete","veintiocho","veintinueve"];
+const TENS = { 30:"treinta", 40:"cuarenta", 50:"cincuenta", 60:"sesenta", 70:"setenta" };
+function numWord(n){ if (n < 30) return SMALL[n]; const t = Math.floor(n/10)*10, r = n % 10; return r === 0 ? TENS[t] : TENS[t] + " y " + SMALL[r]; }
 function letterOf(n){ return LETTERS[Math.floor((n-1)/15)]; }
-function genCard(){
-  const cols = [];
-  for (let c = 0; c < 5; c++){
-    const pool = [];
-    for (let k = 1; k <= 15; k++) pool.push(c*15 + k);
-    const picked = [];
-    while (picked.length < 5){ picked.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); }
-    picked.sort((a,b)=>a-b);
-    cols.push(picked);
-  }
-  cols[2][2] = 0; /* centro libre */
-  return cols; /* cols[c][r] */
-}
+function sample(arr, k){ const a = arr.slice(); for (let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a.slice(0, k).sort((x,y)=>x-y); }
+function genCard(){ const cols = []; for (let c = 0; c < 5; c++){ const nums = []; for (let n = c*15+1; n <= c*15+15; n++) nums.push(n); cols.push(sample(nums, 5)); } cols[2][2] = 0; return cols; }
 function checkWin(card, drawnSet){
-  const hit = (c,r) => card[c][r] === 0 || drawnSet.has(card[c][r]);
+  const hit = (c, r) => card[c][r] === 0 || drawnSet.has(card[c][r]);
   const lines = [];
-  for (let r = 0; r < 5; r++) lines.push([[0,r],[1,r],[2,r],[3,r],[4,r]]);
-  for (let c = 0; c < 5; c++) lines.push([[c,0],[c,1],[c,2],[c,3],[c,4]]);
-  lines.push([[0,0],[1,1],[2,2],[3,3],[4,4]]);
-  lines.push([[0,4],[1,3],[2,2],[3,1],[4,0]]);
-  const winLines = lines.filter(L => L.every(([c,r]) => hit(c,r)));
-  let full = true;
-  for (let c = 0; c < 5; c++) for (let r = 0; r < 5; r++) if (!hit(c,r)) full = false;
-  return { lines: winLines, full };
+  for (let r = 0; r < 5; r++){ let ok = true; for (let c = 0; c < 5; c++) if (!hit(c, r)) { ok = false; break; } if (ok) lines.push(["row", r]); }
+  for (let c = 0; c < 5; c++){ let ok = true; for (let r = 0; r < 5; r++) if (!hit(c, r)) { ok = false; break; } if (ok) lines.push(["col", c]); }
+  let d1 = true, d2 = true;
+  for (let i = 0; i < 5; i++){ if (!hit(i, i)) d1 = false; if (!hit(i, 4-i)) d2 = false; }
+  if (d1) lines.push(["diag", 0]); if (d2) lines.push(["diag", 1]);
+  let full = true; for (let c = 0; c < 5 && full; c++) for (let r = 0; r < 5; r++) if (!hit(c, r)) { full = false; break; }
+  return { lines, full };
 }
+/* ---------- voz ---------- */
 function speak(text){
-  try{
+  try {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "es-ES"; u.rate = 0.95;
-    const vs = speechSynthesis.getVoices().filter(v => /^es/i.test(v.lang));
-    if (vs.length) u.voice = vs[0];
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
-  }catch(e){}
+    const v = speechSynthesis.getVoices().find(x => /^es/i.test(x.lang));
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch(e){}
 }
-if (window.speechSynthesis) speechSynthesis.getVoices();
-function confetti(){
-  const colors = ["#ff4d6d","#c77dff","#4dd2ff","#52ffa8","#ffc94d"];
-  for (let i = 0; i < 70; i++){
-    const d = document.createElement("div");
-    d.className = "confetti";
-    d.style.left = Math.random()*100 + "vw";
-    d.style.background = colors[i % colors.length];
-    d.style.animationDuration = (1.4 + Math.random()*1.6) + "s";
-    d.style.transform = "rotate(" + Math.random()*360 + "deg)";
-    document.body.appendChild(d);
-    setTimeout(()=>d.remove(), 3400);
-  }
-}
-
-/* ============ Render compartido ============ */
-const $ = id => document.getElementById(id);
-function renderCage(el){
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
+/* ---------- renders compartidos ---------- */
+function renderCage(el){ el.innerHTML = ""; for (let n = 1; n <= 15; n++){ const d = document.createElement("div"); d.className = "mini"; const L = LETTERS[n % 5]; d.style.background = BALL_COLORS[L]; d.style.left = (12 + Math.random()*68) + "%"; d.style.top = (12 + Math.random()*68) + "%"; d.textContent = Math.floor(Math.random()*75)+1; el.appendChild(d); } }
+function renderBoardInto(el, drawnSet){ el.innerHTML = ""; LETTERS.forEach((L, ci) => { const col = document.createElement("div"); col.className = "bcol"; col.innerHTML = "<h4 style='color:" + BALL_COLORS[L] + "'>" + L + "</h4>"; const nums = document.createElement("div"); nums.className = "nums"; for (let n = ci*15+1; n <= ci*15+15; n++){ const s = document.createElement("span"); s.className = "num" + (drawnSet.has(n) ? " on" : ""); if (drawnSet.has(n)) s.style.background = BALL_COLORS[L]; s.textContent = n; nums.appendChild(s); } col.appendChild(nums); el.appendChild(col); }); }
+function renderCardInto(el, card, drawnSet, latest){
   el.innerHTML = "";
-  const balls = [[8,30,3],[52,12,1],[70,48,4],[30,62,2],[58,74,0],[18,80,4],[80,18,2],[40,34,0],[12,55,1],[66,86,3]];
-  balls.forEach(([x,y,ci],idx)=>{
-    const b = document.createElement("div");
-    b.className = "mini";
-    b.style.left = x + "%"; b.style.top = y + "%";
-    b.style.background = Object.values(COLORS)[ci];
-    b.style.animationDelay = (idx*0.07) + "s";
-    b.textContent = (ci*15) + ((idx % 15) + 1);
-    el.appendChild(b);
-  });
-}
-function renderCard(el, card, drawnSet, winLines){
-  el.innerHTML = "";
-  LETTERS.forEach((L,c)=>{
-    const h = document.createElement("div");
-    h.className = "chead"; h.style.background = COLORS[L]; h.textContent = L;
-    el.appendChild(h);
-  });
-  const winSet = new Set();
-  (winLines||[]).forEach(L => L.forEach(([c,r]) => winSet.add(c+"-"+r)));
+  LETTERS.forEach(L => { const h = document.createElement("div"); h.className = "chead"; h.style.background = BALL_COLORS[L]; h.textContent = L; el.appendChild(h); });
+  let winCells = new Set();
+  if (card){ const w = checkWin(card, drawnSet); w.lines.forEach(([type, idx]) => { for (let i = 0; i < 5; i++){ if (type === "row") winCells.add(i + "-" + idx); if (type === "col") winCells.add(idx + "-" + i); if (type === "diag" && idx === 0) winCells.add(i + "-" + i); if (type === "diag" && idx === 1) winCells.add(i + "-" + (4-i)); } }); }
   for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++){
-    const d = document.createElement("div");
-    const v = card[c][r];
-    d.className = "cell";
-    if (v === 0){ d.classList.add("free"); d.textContent = "★ LIBRE"; }
-    else {
-      d.textContent = v;
-      if (drawnSet.has(v)) d.classList.add("hit");
-    }
-    if (winSet.has(c+"-"+r)) d.classList.add("winline");
+    const d = document.createElement("div"); const val = card ? card[c][r] : null;
+    if (val === 0){ d.className = "cell free"; d.textContent = "★ LIBRE"; }
+    else { d.className = "cell" + (val !== null && drawnSet.has(val) ? " hit" : "") + (val === latest ? " latest" : ""); d.textContent = val === null ? "·" : val; }
+    if (winCells.has(c + "-" + r)) d.classList.add("winline");
     el.appendChild(d);
   }
 }
-function renderBoard(el, drawnSet){
-  el.innerHTML = "";
-  LETTERS.forEach((L,c)=>{
-    const col = document.createElement("div"); col.className = "bcol";
-    const h = document.createElement("h4"); h.style.color = COLORS[L]; h.textContent = L;
-    const grid = document.createElement("div"); grid.className = "nums";
-    for (let k = 1; k <= 15; k++){
-      const n = c*15 + k;
-      const s = document.createElement("span");
-      s.className = "num" + (drawnSet.has(n) ? " on" : "");
-      if (drawnSet.has(n)) s.style.background = COLORS[L];
-      s.textContent = n;
-      grid.appendChild(s);
-    }
-    col.appendChild(h); col.appendChild(grid); el.appendChild(col);
-  });
-}
-function renderHist(el, drawn){
-  el.innerHTML = "";
-  if (!drawn.length){ el.innerHTML = '<span style="color:var(--muted); font-size:14px">—</span>'; return; }
-  drawn.slice(-10).reverse().forEach(n=>{
-    const s = document.createElement("span");
-    s.className = "hball"; s.style.background = COLORS[letterOf(n)];
-    s.textContent = letterOf(n) + n;
-    el.appendChild(s);
-  });
-}
-function showBall(ballEl, wordEl, n){
+function renderHistInto(el, drawn){ el.innerHTML = ""; drawn.slice().reverse().forEach(n => { const d = document.createElement("div"); d.className = "hball"; d.style.background = BALL_COLORS[letterOf(n)]; d.textContent = n; el.appendChild(d); }); }
+function setBall(prefix, n){
+  const ball = $(prefix + "Ball"), word = $(prefix + "Word");
+  if (n === null){ ball.style.background = "#23233f"; ball.style.borderColor = "var(--line)"; ball.innerHTML = "<span class='bl'>—</span>"; word.textContent = "Todavía no sale ninguna bola"; return; }
   const L = letterOf(n);
-  ballEl.style.background = COLORS[L]; ballEl.style.color = "#fff"; ballEl.style.borderColor = COLORS[L];
-  ballEl.innerHTML = '<span class="bl">' + L + '</span><span class="bn">' + n + '</span>';
-  ballEl.classList.remove("pop"); void ballEl.offsetWidth; ballEl.classList.add("pop");
-  wordEl.textContent = "¡" + L + " — " + n + ", " + numWord(n) + "!";
+  ball.style.background = BALL_COLORS[L]; ball.style.borderColor = BALL_COLORS[L]; ball.style.color = "#fff";
+  ball.innerHTML = "<span class='bl'>" + L + "</span><span class='bn'>" + n + "</span>";
+  ball.classList.remove("pop"); void ball.offsetWidth; ball.classList.add("pop");
+  word.textContent = "¡" + L + " — " + n + ", " + numWord(n) + "!";
 }
-function renderPlayers(ul, countEl, players, hostName){
-  ul.innerHTML = "";
-  players.forEach(p=>{
-    const li = document.createElement("li");
-    li.innerHTML = '<span class="dot"></span><span></span>' + (p === hostName ? '<span class="tag">ANFITRIÓN</span>' : '');
-    li.querySelector("span:nth-child(2)").textContent = p;
-    ul.appendChild(li);
-  });
-  countEl.textContent = players.length;
+function spinCage(prefix, on){
+  const cage = $(prefix + "Cage");
+  if (on){ renderCage(cage); cage.classList.add("spin"); $(prefix + "Word").textContent = "🌀 Girando el biombo…"; }
+  else cage.classList.remove("spin");
 }
-function showScreen(which){
-  ["scrHome","scrHost","scrGuest"].forEach(id => $(id).classList.toggle("hidden", id !== which));
+function confetti(){
+  const colors = ["#ff4d6d","#c77dff","#4dd2ff","#52ffa8","#ffc94d"];
+  for (let i = 0; i < 90; i++){ const d = document.createElement("div"); d.className = "confetti"; d.style.left = Math.random()*100 + "vw"; d.style.background = colors[i % 5]; d.style.animationDuration = (1.6 + Math.random()*1.8) + "s"; document.body.appendChild(d); setTimeout(() => d.remove(), 3600); }
 }
-function winnerShow(text){
-  const b = $("winnerBanner");
-  b.textContent = text; b.classList.remove("hidden"); confetti();
-}
+function winnerShow(html){ const b = $("winnerBanner"); b.innerHTML = html; b.classList.remove("hidden"); }
 function winnerHide(){ $("winnerBanner").classList.add("hidden"); }
+function showScreen(id){ ["scrHome","scrHost","scrGuest"].forEach(s => $(s).classList.toggle("hidden", s !== id)); window.scrollTo(0, 0); }
+function playersHTML(names, hostName){
+  return names.map(nm => "<li><span class='dot'></span>" + escapeHtml(nm) + (nm === hostName ? "<span class='tag'>ANFITRIÓN</span>" : "") + "</li>").join("");
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch])); }
 
-/* ============ Estado global ============ */
+/* ================= TRANSPORTE: relevo en la nube (ntfy) =================
+   Sin conexión directa teléfono-a-teléfono: todo pasa por un servidor
+   relevo público vía HTTPS/WSS (puerto 443), que las operadoras no bloquean. */
+const RELAY_HTTP = "https://ntfy.sh/";
+const RELAY_WS = "wss://ntfy.sh/";
+const myUid = "u" + Math.random().toString(36).slice(2, 12);
+const seenMids = new Set();
+let midCounter = 0;
+function newMid(){ return myUid + "-" + (++midCounter) + "-" + Math.random().toString(36).slice(2, 7); }
+const subs = new Map();
+function subscribe(topic, handler){
+  let s = subs.get(topic);
+  if (!s){ s = { handlers: new Set(), ws: null, closed: false }; subs.set(topic, s); connectSub(topic, s); }
+  s.handlers.add(handler);
+}
+function connectSub(topic, s){
+  let ws;
+  try { ws = new WebSocket(RELAY_WS + topic + "/ws"); } catch(e){ setTimeout(() => { if (!s.closed) connectSub(topic, s); }, 3000); return; }
+  s.ws = ws;
+  ws.onmessage = ev => {
+    let data; try { data = JSON.parse(ev.data); } catch(e){ return; }
+    if (!data || data.event !== "message" || !data.message) return;
+    let msg; try { msg = JSON.parse(data.message); } catch(e){ return; }
+    if (!msg || !msg.t || !msg.mid) return;
+    if (seenMids.has(msg.mid)) return;
+    seenMids.add(msg.mid); if (seenMids.size > 800) seenMids.clear();
+    s.handlers.forEach(h => { try { h(msg); } catch(e){} });
+  };
+  ws.onclose = () => { if (!s.closed) setTimeout(() => connectSub(topic, s), 2500); };
+  ws.onerror = () => { try { ws.close(); } catch(e){} };
+}
+function publish(topic, msg){
+  msg.mid = newMid();
+  seenMids.add(msg.mid);
+  try { fetch(RELAY_HTTP + topic, { method: "POST", body: JSON.stringify(msg) }).catch(() => {}); } catch(e){}
+}
+const lobbyTopic = code => "bnv1-lobby-" + code;
+const roomTopic = (code, secret) => "bnv1-room-" + code + "-" + secret;
+const userTopic = uid => "bnv1-u-" + uid;
+function randCode(){ const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let c = ""; for (let i = 0; i < 6; i++) c += A[Math.floor(Math.random()*A.length)]; return c; }
+function randSecret(){ const A = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; for (let i = 0; i < 10; i++) s += A[Math.floor(Math.random()*A.length)]; return s; }
+
 let myName = "";
-let peer = null;
-
-/* ================================================================
-   ANFITRIÓN
-================================================================ */
-const H = {
-  code:"", players:new Map(), drawn:[], drawnSet:new Set(),
-  myCard:null, spinning:false, won:false
-};
-function hostBroadcast(msg, exceptConn){
-  H.players.forEach(p => { if (p.conn && p.conn !== exceptConn && p.conn.open) { try{ p.conn.send(msg); }catch(e){} } });
-}
-function hostPlayersList(){ return Array.from(H.players.values()).map(p => p.name); }
-function hostSyncPlayers(){
-  renderPlayers($("hostPlayers"), $("hostPCount"), hostPlayersList(), myName);
-  hostBroadcast({type:"players", players: hostPlayersList(), hostName: myName});
-}
-function hostRenderAll(){
-  renderCard($("hostCard"), H.myCard, H.drawnSet, checkWin(H.myCard, H.drawnSet).lines);
-  renderBoard($("hostBoard"), H.drawnSet);
-  renderHist($("hostHist"), H.drawn);
-  $("hostCount").textContent = H.drawn.length + "/75";
-  $("hostStatus").innerHTML = H.drawn.length ? ("Van <b>" + H.drawn.length + "</b> bolas · quedan <b>" + (75 - H.drawn.length) + "</b>") : "Cuando quieras, gira el biombo.";
-  $("btnDraw").disabled = H.spinning || H.drawn.length >= 75;
+/* ================= ANFITRIÓN ================= */
+const H = { active: false, code: "", secret: "", players: new Map(), drawn: [], drawnSet: new Set(), spinning: false, won: false, myCard: null, heartbeat: null };
+function hostNames(){ return Array.from(H.players.values()).map(p => p.name); }
+function hostBroadcastPlayers(){ publish(roomTopic(H.code, H.secret), { t: "players", from: "host", names: hostNames(), hostName: myName }); renderHostPlayers(); }
+function hostSendState(uid){
+  const p = H.players.get(uid); if (!p) return;
+  publish(userTopic(uid), { t: "state", card: p.card, drawn: H.drawn, hostName: myName, code: H.code, names: hostNames() });
 }
 function createRoom(){
   myName = $("inpName").value.trim();
   if (!myName){ $("homeStatus").textContent = "Escribe tu nombre primero."; return; }
   $("homeStatus").textContent = "Creando tu sala…";
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) code += alphabet[Math.floor(Math.random()*alphabet.length)];
-  H.code = code;
-  peer = new Peer(PREFIX + code);
-  peer.on("open", ()=>{
-    H.players.clear(); H.drawn = []; H.drawnSet = new Set(); H.won = false; winnerHide();
-    H.myCard = genCard();
-    H.players.set("host", {name: myName, card: H.myCard, conn: null});
-    showScreen("scrHost");
-    $("hostCode").textContent = code;
-    const link = location.origin + location.pathname + "?sala=" + code;
-    $("hostLink").textContent = link;
-    $("btnCopy").onclick = ()=>{ navigator.clipboard && navigator.clipboard.writeText(link); $("btnCopy").textContent = "✅ ¡Enlace copiado!"; setTimeout(()=>$("btnCopy").textContent = "📋 Copiar enlace de invitación", 2000); };
-    try{
-      const canvas = document.createElement("canvas");
-      QRCode.toCanvas(canvas, link, {width:176, margin:1}, err=>{
-        if (!err){ const q = $("qr"); q.innerHTML=""; q.appendChild(canvas); }
-      });
-    }catch(e){}
-    renderCage($("cageHost"));
-    hostSyncPlayers(); hostRenderAll();
-    speak("Sala creada. Código " + code.split("").join(" "));
-  });
-  peer.on("connection", conn => {
-    conn.on("data", msg => hostOnData(conn, msg));
-    conn.on("close", ()=>{
-      H.players.forEach((p,k)=>{ if (p.conn === conn) H.players.delete(k); });
-      hostSyncPlayers();
-    });
-  });
-  peer.on("error", err => {
-    if (err.type === "unavailable-id"){ $("homeStatus").textContent = "Ese código se ocupó justo ahora; toca de nuevo para crear otro."; }
-    else $("homeStatus").textContent = "Hubo un problema de conexión (" + err.type + "). Revisa tu internet e inténtalo de nuevo.";
-  });
-}
-function hostOnData(conn, msg){
-  if (!msg || !msg.type) return;
-  if (msg.type === "join"){
-    const name = (msg.name || "Jugador").slice(0,20);
-    const key = conn.peer;
-    const card = genCard();
-    H.players.set(key, {name, card, conn});
-    conn.send({type:"welcome", card, drawn: H.drawn, players: hostPlayersList(), hostName: myName, code: H.code, winner: H.winnerName || null});
-    hostSyncPlayers();
-    speak("Se unió " + name);
-  }
-  if (msg.type === "bingo"){
-    let entry = null;
-    H.players.forEach(p => { if (p.conn === conn) entry = p; });
-    if (!entry) return;
-    const res = checkWin(entry.card, H.drawnSet);
-    if (res.lines.length){
-      H.won = true; H.winnerName = entry.name + (res.full ? " · ¡CARTÓN LLENO!" : " · línea completa");
-      const payload = {type:"winner", name: entry.name, full: res.full};
-      hostBroadcast(payload);
-      winnerShow("🏆 ¡BINGO de " + entry.name + (res.full ? " — CARTÓN LLENO!" : "!"));
-      speak("¡Bingo! Ganó " + entry.name);
-      renderPlayers($("hostPlayers"), $("hostPCount"), hostPlayersList(), myName);
-    } else {
-      conn.send({type:"bingoInvalid"});
+  H.code = randCode(); H.secret = randSecret(); H.active = true;
+  H.players.clear(); H.drawn = []; H.drawnSet = new Set(); H.won = false; winnerHide();
+  H.myCard = genCard();
+  H.players.set(myUid, { name: myName, card: H.myCard });
+  subscribe(lobbyTopic(H.code), msg => {
+    if (msg.t === "knock" && msg.uid && msg.name){
+      if (!H.players.has(msg.uid)) { H.players.set(msg.uid, { name: String(msg.name).slice(0, 20), card: genCard() }); hostBroadcastPlayers(); }
+      publish(userTopic(msg.uid), { t: "invite", secret: H.secret, code: H.code, hostName: myName });
     }
-  }
+  });
+  subscribe(roomTopic(H.code, H.secret), msg => {
+    if (msg.from === "host") return;
+    if (msg.t === "hello" && msg.uid && msg.name){
+      if (!H.players.has(msg.uid)) { H.players.set(msg.uid, { name: String(msg.name).slice(0, 20), card: genCard() }); hostBroadcastPlayers(); }
+      hostSendState(msg.uid);
+    }
+    if (msg.t === "bingo" && msg.uid){
+      const p = H.players.get(msg.uid); if (!p || H.won) return;
+      const w = checkWin(p.card, H.drawnSet);
+      if (w.lines.length && H.drawn.length >= 5){
+        H.won = true;
+        publish(roomTopic(H.code, H.secret), { t: "winner", from: "host", name: p.name, big: w.full });
+        hostOnWinner(p.name, w.full);
+      } else {
+        publish(userTopic(msg.uid), { t: "bingoInvalid" });
+      }
+    }
+    if (msg.t === "leave" && msg.uid){ if (H.players.delete(msg.uid)) hostBroadcastPlayers(); }
+  });
+  showScreen("scrHost");
+  $("hostCode").textContent = H.code;
+  const link = location.origin + location.pathname + "?sala=" + H.code + "&k=" + H.secret;
+  $("hostLink").textContent = link;
+  drawQR(link);
+  setBall("host", null);
+  renderHostAll();
+  $("homeStatus").textContent = "";
+  clearInterval(H.heartbeat);
+  H.heartbeat = setInterval(() => publish(roomTopic(H.code, H.secret), { t: "ping", from: "host" }), 12000);
+}
+function drawQR(link){
+  $("qr").innerHTML = "<img alt='Código QR de invitación' width='180' height='180' style='background:#fff;padding:10px;border-radius:14px' src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(link) + "'>";
+}
+function renderHostPlayers(){ $("hostPlayers").innerHTML = playersHTML(hostNames(), myName); $("hostPlayersTitle").textContent = "JUGADORES (" + H.players.size + ")"; }
+function renderHostAll(){
+  renderHostPlayers();
+  renderCardInto($("hostCard"), H.myCard, H.drawnSet, H.drawn[H.drawn.length-1]);
+  renderBoardInto($("hostBoard"), H.drawnSet);
+  renderHistInto($("hostHist"), H.drawn);
+  $("hostCount").textContent = H.drawn.length + "/75";
+  $("hostStatus").innerHTML = H.drawn.length ? ("Van <b>" + H.drawn.length + "</b> bolas · quedan <b>" + (75 - H.drawn.length) + "</b>") : "Cuando quieras, gira el biombo.";
+  $("btnDraw").disabled = H.spinning || H.drawn.length >= 75;
 }
 function hostDraw(){
   if (H.spinning || H.drawn.length >= 75) return;
-  H.spinning = true;
-  $("btnDraw").disabled = true;
-  $("cageHost").classList.add("spin");
-  hostBroadcast({type:"spin"});
-  speak("Girando el biombo");
-  setTimeout(()=>{
-    const remaining = [];
-    for (let n = 1; n <= 75; n++) if (!H.drawnSet.has(n)) remaining.push(n);
-    const ball = remaining[Math.floor(Math.random()*remaining.length)];
-    H.drawn.push(ball); H.drawnSet.add(ball);
-    $("cageHost").classList.remove("spin");
-    showBall($("hostBall"), $("hostWord"), ball);
-    speak(letterOf(ball) + ", " + numWord(ball));
-    hostBroadcast({type:"draw", ball, drawn: H.drawn});
-    H.spinning = false;
-    hostRenderAll();
+  H.spinning = true; renderHostAll();
+  publish(roomTopic(H.code, H.secret), { t: "spin", from: "host" });
+  spinCage("host", true); speak("Girando el biombo");
+  setTimeout(() => {
+    const rest = []; for (let n = 1; n <= 75; n++) if (!H.drawnSet.has(n)) rest.push(n);
+    const n = rest[Math.floor(Math.random()*rest.length)];
+    H.drawn.push(n); H.drawnSet.add(n); H.spinning = false;
+    publish(roomTopic(H.code, H.secret), { t: "draw", from: "host", n, drawn: H.drawn });
+    spinCage("host", false); setBall("host", n); renderHostAll();
+    speak(letterOf(n) + ", " + numWord(n));
   }, 2300);
 }
+function hostOnWinner(name, big){
+  winnerShow("🏆 ¡BINGO" + (big ? " MAYOR" : "") + "! Ganó <b>" + escapeHtml(name) + "</b>");
+  speak("¡Bingo! Ganó " + name); confetti(); renderHostAll();
+}
 function hostReset(){
-  H.drawn = []; H.drawnSet = new Set(); H.won = false; H.winnerName = null; winnerHide();
-  H.myCard = genCard();
-  H.players.set("host", {name: myName, card: H.myCard, conn: null});
-  H.players.forEach((p,k)=>{
-    if (p.conn){ p.card = genCard(); try{ p.conn.send({type:"reset", card: p.card}); }catch(e){} }
-  });
-  $("hostBall").style.background = "#23233f"; $("hostBall").innerHTML = '<span class="bl">—</span><span class="bn">?</span>';
-  $("hostWord").textContent = "Partida nueva: todavía no sale ninguna bola";
-  hostRenderAll(); hostSyncPlayers();
-  speak("Nueva partida. Cartones nuevos para todos.");
+  H.drawn = []; H.drawnSet = new Set(); H.won = false; winnerHide();
+  H.players.forEach((p, uid) => { p.card = genCard(); if (uid === myUid) H.myCard = p.card; else publish(userTopic(uid), { t: "newcard", card: p.card }); });
+  publish(roomTopic(H.code, H.secret), { t: "reset", from: "host" });
+  setBall("host", null); renderHostAll();
 }
 function hostClose(){
-  hostBroadcast({type:"closed"});
-  if (peer) peer.destroy();
-  location.href = location.pathname;
+  publish(roomTopic(H.code, H.secret), { t: "closed", from: "host" });
+  clearInterval(H.heartbeat);
+  setTimeout(() => location.href = location.origin + location.pathname, 400);
 }
-
-/* ================================================================
-   JUGADOR
-================================================================ */
-const G = { code:"", conn:null, card:null, drawn:[], drawnSet:new Set(), hostName:"", players:[] };
-function guestRenderAll(){
-  const res = G.card ? checkWin(G.card, G.drawnSet) : {lines:[]};
-  if (G.card) renderCard($("guestCard"), G.card, G.drawnSet, res.lines);
-  renderBoard($("guestBoard"), G.drawnSet);
-  renderHist($("guestHist"), G.drawn);
-  $("guestCount").textContent = G.drawn.length + "/75";
-  renderPlayers($("guestPlayers"), $("guestPCount"), G.players, G.hostName);
-}
+/* ================= INVITADO ================= */
+const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null };
 function joinRoom(){
   myName = $("inpName").value.trim();
   const code = $("inpCode").value.trim().toUpperCase();
   if (!myName){ $("homeStatus").textContent = "Escribe tu nombre primero."; return; }
-  if (code.length !== 6){ $("homeStatus").textContent = "El código de la sala tiene 6 caracteres."; return; }
+  if (!/^[A-Z0-9]{6}$/.test(code)){ $("homeStatus").textContent = "Escribe el código de 6 letras de la sala."; return; }
+  G.code = code; G.joined = false; winnerHide();
   $("homeStatus").textContent = "Entrando a la sala " + code + "…";
-  G.code = code;
-  peer = new Peer();
-  peer.on("open", ()=>{
-    const conn = peer.connect(PREFIX + code, {reliable:true});
-    G.conn = conn;
-    conn.on("open", ()=>{ conn.send({type:"join", name: myName}); });
-    conn.on("data", guestOnData);
-    conn.on("close", ()=>{ $("guestStatus").innerHTML = "⚠️ Se cortó la conexión con el anfitrión."; });
+  subscribe(userTopic(myUid), msg => {
+    if (msg.t === "invite" && msg.code === G.code && !G.secret){ G.secret = msg.secret; G.hostName = msg.hostName || ""; clearInterval(G.knockTimer); enterRoom(); }
+    if (msg.t === "state"){ guestOnState(msg); }
+    if (msg.t === "newcard"){ G.card = msg.card; renderGuestAll(); if (G.drawnSet.size) guestStatusHit(); }
+    if (msg.t === "bingoInvalid"){ $("bingoMsg").textContent = "Todavía no tienes línea completa. ¡Sigue jugando!"; speak("Todavía no"); }
   });
-  peer.on("error", err => {
-    if (err.type === "peer-unavailable") $("homeStatus").textContent = "No encontré esa sala. Revisa el código: la sala debe estar abierta en el teléfono del anfitrión.";
-    else $("homeStatus").textContent = "Problema de conexión (" + err.type + "). Revisa tu internet e inténtalo de nuevo.";
-  });
+  if (pendingSecret){ G.secret = pendingSecret; enterRoom(); }
+  else {
+    const knock = () => publish(lobbyTopic(code), { t: "knock", uid: myUid, name: myName });
+    knock(); G.knockTimer = setInterval(knock, 3500);
+  }
+  clearTimeout(G.joinTimeout);
+  G.joinTimeout = setTimeout(() => {
+    if (!G.joined){ clearInterval(G.knockTimer); clearInterval(G.helloTimer); $("homeStatus").textContent = "No se encontró esa sala. Revisa el código o pide el enlace de invitación."; }
+  }, 45000);
 }
-function guestOnData(msg){
-  if (!msg || !msg.type) return;
-  if (msg.type === "welcome"){
-    G.card = msg.card; G.drawn = msg.drawn || []; G.drawnSet = new Set(G.drawn);
-    G.hostName = msg.hostName; G.players = msg.players || [];
-    showScreen("scrGuest");
-    $("guestCode").textContent = G.code;
-    $("guestHost").textContent = G.hostName;
-    $("guestNameLbl").textContent = myName;
-    renderCage($("cageGuest"));
-    if (G.drawn.length){
-      const last = G.drawn[G.drawn.length-1];
-      showBall($("guestBall"), $("guestWord"), last);
-    }
-    if (msg.winner) winnerShow("🏆 ¡BINGO de " + msg.winner + "!");
-    guestRenderAll();
-    $("guestStatus").innerHTML = "Conectado ✅ Tu cartón ya está marcado al día.";
-    speak("Entraste a la sala. Tu cartón está listo.");
+function enterRoom(){
+  subscribe(roomTopic(G.code, G.secret), msg => { if (msg.from === "host") guestOnRoom(msg); });
+  const hello = () => publish(roomTopic(G.code, G.secret), { t: "hello", uid: myUid, name: myName });
+  hello(); clearInterval(G.helloTimer); G.helloTimer = setInterval(() => { if (!G.joined) hello(); }, 4000);
+}
+function guestOnState(msg){
+  G.card = msg.card; G.hostName = msg.hostName || G.hostName;
+  G.drawn = msg.drawn || []; G.drawnSet = new Set(G.drawn);
+  G.joined = true; clearTimeout(G.joinTimeout); clearInterval(G.helloTimer); clearInterval(G.knockTimer);
+  $("guestCode").textContent = G.code;
+  $("guestHost").textContent = G.hostName;
+  showScreen("scrGuest");
+  setBall("guest", G.drawn.length ? G.drawn[G.drawn.length-1] : null);
+  renderGuestAll(msg.names);
+  $("guestStatus").innerHTML = "Conectado ✅ Tu cartón ya está marcado al día.";
+  $("homeStatus").textContent = "";
+}
+function guestOnRoom(msg){
+  if (msg.t === "spin"){ spinCage("guest", true); }
+  if (msg.t === "draw"){
+    spinCage("guest", false);
+    G.drawn = Array.isArray(msg.drawn) && msg.drawn.length >= G.drawn.length ? msg.drawn : G.drawn.concat(msg.n);
+    G.drawnSet = new Set(G.drawn);
+    setBall("guest", msg.n); renderGuestAll(); speak(letterOf(msg.n) + ", " + numWord(msg.n));
+    guestStatusHit();
   }
-  if (msg.type === "players"){ G.players = msg.players; G.hostName = msg.hostName || G.hostName; renderPlayers($("guestPlayers"), $("guestPCount"), G.players, G.hostName); }
-  if (msg.type === "spin"){ $("cageGuest").classList.add("spin"); $("guestWord").textContent = "🌀 El biombo está girando…"; }
-  if (msg.type === "draw"){
-    G.drawn = msg.drawn; G.drawnSet = new Set(G.drawn);
-    $("cageGuest").classList.remove("spin");
-    showBall($("guestBall"), $("guestWord"), msg.ball);
-    speak(letterOf(msg.ball) + ", " + numWord(msg.ball));
-    guestRenderAll();
-    if (G.card && G.card.flat().includes(msg.ball)) $("guestStatus").innerHTML = "🎯 ¡Ese número está en tu cartón!";
+  if (msg.t === "players"){ renderGuestPlayers(msg.names, msg.hostName); }
+  if (msg.t === "winner"){
+    winnerShow("🏆 ¡BINGO" + (msg.big ? " MAYOR" : "") + "! Ganó <b>" + escapeHtml(msg.name) + "</b>");
+    speak("¡Bingo! Ganó " + msg.name); confetti();
   }
-  if (msg.type === "winner"){
-    winnerShow("🏆 ¡BINGO de " + msg.name + (msg.full ? " — CARTÓN LLENO!" : "!"));
-    speak("¡Bingo! Ganó " + msg.name);
-    guestRenderAll();
-  }
-  if (msg.type === "bingoInvalid"){
-    $("bingoMsg").textContent = "Todavía no: te falta completar una línea. ¡Sigue atento!";
-  }
-  if (msg.type === "reset"){
-    G.card = msg.card; G.drawn = []; G.drawnSet = new Set(); winnerHide();
-    $("guestBall").style.background = "#23233f"; $("guestBall").innerHTML = '<span class="bl">—</span><span class="bn">?</span>';
-    $("guestWord").textContent = "Partida nueva. ¡Cartón nuevo, suerte!";
+  if (msg.t === "reset"){
+    G.drawn = []; G.drawnSet = new Set(); winnerHide(); setBall("guest", null); renderGuestAll();
+    $("guestStatus").innerHTML = "🔄 Nueva partida: el anfitrión repartió cartones nuevos.";
     $("bingoMsg").textContent = "";
-    guestRenderAll();
-    speak("Nueva partida. Cartón nuevo.");
   }
-  if (msg.type === "closed"){
-    alert("El anfitrión cerró la sala.");
-    location.href = location.pathname;
+  if (msg.t === "closed"){
+    winnerHide(); showScreen("scrHome");
+    $("homeStatus").textContent = "El anfitrión cerró la sala. ¡Gracias por jugar!";
+    G.joined = false; G.secret = "";
   }
 }
-
-/* ============ Arranque ============ */
-$("btnCreate").onclick = createRoom;
-$("btnJoin").onclick = joinRoom;
-$("btnDraw").onclick = hostDraw;
-$("btnReset").onclick = hostReset;
-$("btnClose").onclick = hostClose;
-$("btnLeave").onclick = ()=>{ if (peer) peer.destroy(); location.href = location.pathname; };
-$("btnBingo").onclick = ()=>{
-  if (G.conn && G.conn.open){ G.conn.send({type:"bingo"}); $("bingoMsg").textContent = "Verificando tu cartón…"; }
-  else $("bingoMsg").textContent = "Sin conexión con el anfitrión.";
-};
-renderCage($("cageHost")); renderCage($("cageGuest"));
-const qs = new URLSearchParams(location.search);
-if (qs.get("sala")) $("inpCode").value = qs.get("sala").toUpperCase();
+function guestStatusHit(){
+  const last = G.drawn[G.drawn.length-1];
+  if (G.card && last && G.card.flat().includes(last)) $("guestStatus").innerHTML = "🎯 ¡Ese número está en tu cartón!";
+}
+function renderGuestPlayers(names, hostName){
+  if (!names) return;
+  $("guestPlayers").innerHTML = playersHTML(names, hostName || G.hostName);
+  $("guestPlayersTitle").textContent = "JUGADORES (" + names.length + ")";
+}
+function renderGuestAll(names){
+  renderCardInto($("guestCard"), G.card, G.drawnSet, G.drawn[G.drawn.length-1]);
+  renderBoardInto($("guestBoard"), G.drawnSet);
+  renderHistInto($("guestHist"), G.drawn);
+  $("guestCount").textContent = G.drawn.length + "/75";
+  if (names) renderGuestPlayers(names, G.hostName);
+}
+function guestBingo(){
+  if (!G.joined) return;
+  publish(roomTopic(G.code, G.secret), { t: "bingo", uid: myUid, name: myName });
+  $("bingoMsg").textContent = "Revisando tu bingo…";
+}
+function guestLeave(){
+  if (G.code && G.secret) publish(roomTopic(G.code, G.secret), { t: "leave", uid: myUid });
+  setTimeout(() => location.href = location.origin + location.pathname, 300);
+}
+/* ---------- botones y arranque ---------- */
+$("btnCreate").addEventListener("click", createRoom);
+$("btnJoin").addEventListener("click", joinRoom);
+$("btnDraw").addEventListener("click", hostDraw);
+$("btnReset").addEventListener("click", hostReset);
+$("btnClose").addEventListener("click", hostClose);
+$("btnBingo").addEventListener("click", guestBingo);
+$("btnLeave").addEventListener("click", guestLeave);
+$("btnCopy").addEventListener("click", () => {
+  const link = $("hostLink").textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => { $("hostStatus").textContent = "Enlace copiado ✅ Compártelo por WhatsApp."; });
+});
+renderCage($("hostCage")); renderCage($("guestCage"));
+let pendingSecret = "";
+const params = new URLSearchParams(location.search);
+if (params.get("sala")){ $("inpCode").value = params.get("sala").toUpperCase(); pendingSecret = params.get("k") || ""; if (pendingSecret) $("homeStatus").textContent = "Tienes una invitación: escribe tu nombre y pulsa «Entrar con mi cartón»."; }
 </script>
 </body>
 </html>
