@@ -48,24 +48,41 @@
   .tag{margin-left:auto; font-size:11px; color:#0b0b20; background:var(--o); padding:2px 8px; border-radius:99px; font-weight:800}
   /* Biombo */
   .cage-zone{display:flex; flex-direction:column; align-items:center}
-  .cage{position:relative; width:230px; height:230px; border-radius:50%; margin:6px auto;
-    border:3px solid #3a3a75; background:radial-gradient(circle at 35% 30%, rgba(120,140,255,.20), rgba(10,10,30,.9) 65%);
-    box-shadow:0 0 0 8px #12122c, 0 0 42px rgba(90,80,255,.35), inset 0 0 60px rgba(0,0,0,.6); overflow:hidden}
-  .cage::before{content:""; position:absolute; inset:0; border-radius:50%;
-    background:repeating-conic-gradient(from 0deg, transparent 0deg 24deg, rgba(160,170,255,.13) 24deg 26deg)}
-  .cage::after{content:""; position:absolute; inset:14px; border-radius:50%; border:2px solid rgba(160,170,255,.18)}
-  .cage.spin{animation:cagespin .28s linear infinite}
-  @keyframes cagespin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  .mini{position:absolute; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-weight:900; font-size:14px; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.6); box-shadow:inset -4px -6px 10px rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.4)}
-  .cage.spin .mini{animation:tumble .5s ease-in-out infinite alternate}
-  @keyframes tumble{from{margin-top:-7px}to{margin-top:9px}}
-  .bigball{width:118px; height:118px; border-radius:50%; margin:12px auto 2px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    background:#23233f; border:3px solid var(--line); color:var(--muted); transition:transform .15s}
+  .cage{position:relative; width:min(330px,84vw); height:min(330px,84vw); border-radius:50%; margin:10px auto 4px;
+    border:4px solid #4a4a8f; background:radial-gradient(circle at 35% 28%, rgba(150,170,255,.28), rgba(10,10,32,.94) 68%);
+    box-shadow:0 0 0 10px #141432, 0 0 60px rgba(90,80,255,.45), inset 0 0 70px rgba(0,0,0,.65), inset 0 -18px 34px rgba(0,0,0,.5); overflow:hidden}
+  .cage .bars{position:absolute; inset:0; border-radius:50%; z-index:3; pointer-events:none;
+    background:
+      repeating-conic-gradient(from 0deg, transparent 0deg 13deg, rgba(205,215,255,.38) 13deg 15.5deg),
+      repeating-conic-gradient(from 7deg, transparent 0deg 44deg, rgba(205,215,255,.16) 44deg 47deg);
+    animation:barsrotate 26s linear infinite}
+  .cage .bars::after{content:""; position:absolute; inset:9%; border-radius:50%; border:3px solid rgba(205,215,255,.30);
+    box-shadow:inset 0 0 0 2px rgba(0,0,0,.25), 0 0 0 2px rgba(0,0,0,.15)}
+  .cage .shine{position:absolute; inset:0; border-radius:50%; z-index:4; pointer-events:none;
+    background:radial-gradient(circle at 30% 20%, rgba(255,255,255,.20), rgba(255,255,255,0) 42%)}
+  .cage .balls{position:absolute; inset:0; z-index:2}
+  .cage.spin .bars{animation:barsrotate .55s linear infinite}
+  .cage.spin .balls{animation:cagespin .8s linear infinite}
+  @keyframes barsrotate{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  @keyframes cagespin{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
+  .cagebase{width:56%; height:20px; margin:0 auto; border-radius:50%; background:radial-gradient(ellipse at center, rgba(0,0,0,.65), rgba(0,0,0,0) 70%)}
+  .mini{position:absolute; width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    box-shadow:inset -6px -9px 14px rgba(0,0,0,.45), inset 4px 6px 10px rgba(255,255,255,.35), 0 5px 10px rgba(0,0,0,.5)}
+  .mini .nb{background:radial-gradient(circle at 38% 32%, #ffffff, #dfe3ee 78%); color:#191930; border-radius:50%;
+    width:62%; height:62%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:16px;
+    box-shadow:inset 0 -2px 4px rgba(0,0,0,.22), 0 1px 2px rgba(0,0,0,.3)}
+  .cage.spin .mini{animation:tumble .38s ease-in-out infinite alternate}
+  @keyframes tumble{from{transform:translateY(-11px) rotate(-14deg)}to{transform:translateY(13px) rotate(16deg)}}
+  .bigball{width:150px; height:150px; border-radius:50%; margin:14px auto 2px; display:flex; align-items:center; justify-content:center;
+    background:#23233f; border:3px solid var(--line); color:var(--muted); transition:transform .15s;
+    box-shadow:inset -12px -18px 30px rgba(0,0,0,.5), inset 8px 12px 22px rgba(255,255,255,.28), 0 14px 28px rgba(0,0,0,.55)}
+  .bigball .bbadge{background:radial-gradient(circle at 38% 30%, #ffffff, #dde1ee 80%); border-radius:50%; width:68%; height:68%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; color:#191930;
+    box-shadow:inset 0 -4px 8px rgba(0,0,0,.20), 0 2px 5px rgba(0,0,0,.30)}
   .bigball.pop{animation:pop .45s ease}
   @keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
-  .bigball .bl{font-size:19px; font-weight:900; letter-spacing:3px}
-  .bigball .bn{font-size:47px; font-weight:900; line-height:1}
+  .bigball .bl{font-size:20px; font-weight:900; letter-spacing:4px; line-height:1}
+  .bigball .bn{font-size:52px; font-weight:900; line-height:1.02}
   .ballword{text-align:center; font-size:17px; color:var(--txt); min-height:24px; margin:4px 0 0; font-weight:600}
   /* Cartón */
   .cardgrid{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px}
@@ -83,13 +100,13 @@
   .num{font-size:12px; text-align:center; padding:5px 0; border-radius:7px; background:#0d0d26; border:1px solid #22224a; color:#6d72a8; font-weight:700}
   .num.on{color:#fff; font-weight:900}
   .hist{display:flex; flex-wrap:wrap; gap:6px; margin-top:6px}
-  .hball{width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.55); box-shadow:inset -3px -5px 8px rgba(0,0,0,.35)}
+  .hball{width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:900; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.55); box-shadow:inset -5px -8px 12px rgba(0,0,0,.45), inset 3px 5px 8px rgba(255,255,255,.40), 0 4px 8px rgba(0,0,0,.45)}
   .secttl{font-size:13px; letter-spacing:1.6px; color:var(--muted); font-weight:800; margin:0 0 8px; text-transform:uppercase}
   .banner{background:linear-gradient(90deg,#7a4d00,#b8860b); border:1px solid var(--o); color:#fff8e1; border-radius:14px; padding:14px; text-align:center; font-size:19px; font-weight:900; margin:0 0 16px; animation:pop .5s ease}
   .confetti{position:fixed; top:-12px; width:10px; height:16px; z-index:99; border-radius:2px; animation:fall linear forwards}
   @keyframes fall{to{transform:translateY(105vh) rotate(720deg)}}
   .foot{text-align:center; color:#55587f; font-size:12px; margin-top:8px}
-  @media (max-width:380px){ .cell{height:46px; font-size:19px} .cage{width:200px;height:200px} }
+  @media (max-width:380px){ .cell{height:46px; font-size:19px} .mini{width:40px;height:40px} .mini .nb{font-size:14px} }
 </style>
 </head>
 <body>
@@ -223,7 +240,34 @@ function speak(text){
 }
 if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
 /* ---------- renders compartidos ---------- */
-function renderCage(el){ el.innerHTML = ""; for (let n = 1; n <= 15; n++){ const d = document.createElement("div"); d.className = "mini"; const L = LETTERS[n % 5]; d.style.background = BALL_COLORS[L]; d.style.left = (12 + Math.random()*68) + "%"; d.style.top = (12 + Math.random()*68) + "%"; d.textContent = Math.floor(Math.random()*75)+1; el.appendChild(d); } }
+function shade(hex, f){
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  if (f >= 0){ r = Math.round(r + (255 - r) * f); g = Math.round(g + (255 - g) * f); b = Math.round(b + (255 - b) * f); }
+  else { r = Math.round(r * (1 + f)); g = Math.round(g * (1 + f)); b = Math.round(b * (1 + f)); }
+  return "rgb(" + r + "," + g + "," + b + ")";
+}
+function ballBg(hex){
+  return "radial-gradient(circle at 32% 26%, " + shade(hex, .75) + " 0%, " + shade(hex, .25) + " 30%, " + hex + " 58%, " + shade(hex, -.45) + " 100%)";
+}
+function renderCage(el){
+  el.innerHTML = "";
+  const balls = document.createElement("div"); balls.className = "balls";
+  const used = new Set();
+  for (let i = 0; i < 16; i++){
+    let num; do { num = Math.floor(Math.random()*75)+1; } while (used.has(num)); used.add(num);
+    const d = document.createElement("div"); d.className = "mini";
+    d.style.background = ballBg(BALL_COLORS[letterOf(num)]);
+    d.style.left = (8 + Math.random()*72) + "%"; d.style.top = (10 + Math.random()*70) + "%";
+    d.style.animationDelay = (Math.random() * .35) + "s";
+    d.style.animationDuration = (.3 + Math.random() * .25) + "s";
+    d.innerHTML = "<span class='nb'>" + num + "</span>";
+    balls.appendChild(d);
+  }
+  const bars = document.createElement("div"); bars.className = "bars";
+  const shine = document.createElement("div"); shine.className = "shine";
+  el.appendChild(balls); el.appendChild(bars); el.appendChild(shine);
+}
 function renderBoardInto(el, drawnSet){ el.innerHTML = ""; LETTERS.forEach((L, ci) => { const col = document.createElement("div"); col.className = "bcol"; col.innerHTML = "<h4 style='color:" + BALL_COLORS[L] + "'>" + L + "</h4>"; const nums = document.createElement("div"); nums.className = "nums"; for (let n = ci*15+1; n <= ci*15+15; n++){ const s = document.createElement("span"); s.className = "num" + (drawnSet.has(n) ? " on" : ""); if (drawnSet.has(n)) s.style.background = BALL_COLORS[L]; s.textContent = n; nums.appendChild(s); } col.appendChild(nums); el.appendChild(col); }); }
 function renderCardInto(el, card, drawnSet, latest){
   el.innerHTML = "";
@@ -238,13 +282,13 @@ function renderCardInto(el, card, drawnSet, latest){
     el.appendChild(d);
   }
 }
-function renderHistInto(el, drawn){ el.innerHTML = ""; drawn.slice().reverse().forEach(n => { const d = document.createElement("div"); d.className = "hball"; d.style.background = BALL_COLORS[letterOf(n)]; d.textContent = n; el.appendChild(d); }); }
+function renderHistInto(el, drawn){ el.innerHTML = ""; drawn.slice().reverse().forEach(n => { const d = document.createElement("div"); d.className = "hball"; d.style.background = ballBg(BALL_COLORS[letterOf(n)]); d.textContent = n; el.appendChild(d); }); }
 function setBall(prefix, n){
   const ball = $(prefix + "Ball"), word = $(prefix + "Word");
-  if (n === null){ ball.style.background = "#23233f"; ball.style.borderColor = "var(--line)"; ball.innerHTML = "<span class='bl'>—</span>"; word.textContent = "Todavía no sale ninguna bola"; return; }
+  if (n === null){ ball.style.background = "#23233f"; ball.style.borderColor = "var(--line)"; ball.innerHTML = "<span class='bl' style='color:var(--muted)'>—</span>"; word.textContent = "Todavía no sale ninguna bola"; return; }
   const L = letterOf(n);
-  ball.style.background = BALL_COLORS[L]; ball.style.borderColor = BALL_COLORS[L]; ball.style.color = "#fff";
-  ball.innerHTML = "<span class='bl'>" + L + "</span><span class='bn'>" + n + "</span>";
+  ball.style.background = ballBg(BALL_COLORS[L]); ball.style.borderColor = shade(BALL_COLORS[L], -.3); ball.style.color = "#fff";
+  ball.innerHTML = "<span class='bbadge'><span class='bl'>" + L + "</span><span class='bn'>" + n + "</span></span>";
   ball.classList.remove("pop"); void ball.offsetWidth; ball.classList.add("pop");
   word.textContent = "¡" + L + " — " + n + ", " + numWord(n) + "!";
 }
