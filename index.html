@@ -305,6 +305,73 @@ function speak(text){
   } catch(e){}
 }
 if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
+/* ---------- sonido del biombo (WebAudio, sin archivos) ---------- */
+let AC = null, masterGain = null;
+function ensureAudio(){
+  try {
+    if (!AC){
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return false;
+      AC = new Ctx();
+      masterGain = AC.createGain(); masterGain.gain.value = 0.95;
+      const comp = AC.createDynamicsCompressor();
+      masterGain.connect(comp); comp.connect(AC.destination);
+    }
+    if (AC.state === "suspended") AC.resume();
+    return true;
+  } catch(e){ return false; }
+}
+let _noiseBuf = null;
+function noiseBuffer(){
+  if (_noiseBuf) return _noiseBuf;
+  const len = AC.sampleRate;
+  const buf = AC.createBuffer(1, len, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  _noiseBuf = buf; return buf;
+}
+function clack(t, vol, freq){
+  const src = AC.createBufferSource(); src.buffer = noiseBuffer();
+  const bp = AC.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = freq; bp.Q.value = 1.1;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.075);
+  src.connect(bp); bp.connect(g); g.connect(masterGain);
+  src.start(t, Math.random() * 0.5, 0.1); src.stop(t + 0.11);
+}
+function spinSound(durMs){
+  if (!ensureAudio()) return;
+  const t0 = AC.currentTime + 0.02, total = durMs / 1000;
+  const src = AC.createBufferSource(); src.buffer = noiseBuffer(); src.loop = true;
+  const lp = AC.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 430;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.30, t0 + 0.22);
+  g.gain.setValueAtTime(0.30, Math.max(t0 + 0.22, t0 + total - 0.45));
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + total);
+  src.connect(lp); lp.connect(g); g.connect(masterGain);
+  src.start(t0); src.stop(t0 + total + 0.05);
+  let t = t0 + 0.03;
+  while (t < t0 + total - 0.05){
+    const p = (t - t0) / total;
+    clack(t, 0.38 + Math.random() * 0.5, 700 + Math.random() * 2000);
+    t += (0.088 - Math.sin(p * Math.PI) * 0.042) + Math.random() * 0.028;
+  }
+}
+function ballThunk(){
+  if (!AC || !masterGain) return;
+  try {
+    const t = AC.currentTime;
+    const o = AC.createOscillator(); o.type = "sine";
+    o.frequency.setValueAtTime(200, t);
+    o.frequency.exponentialRampToValueAtTime(68, t + 0.12);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(0.55, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+    o.connect(g); g.connect(masterGain); o.start(t); o.stop(t + 0.19);
+  } catch(e){}
+}
 /* ---------- renders compartidos ---------- */
 function shade(hex, f){
   const n = parseInt(hex.slice(1), 16);
@@ -432,6 +499,7 @@ function hostSendState(uid){
   publish(userTopic(uid), { t: "state", card: p.card, drawn: H.drawn, hostName: myName, code: H.code, names: hostNames(), pattern: H.pattern });
 }
 function createRoom(){
+  ensureAudio();
   myName = $("inpName").value.trim();
   if (!myName){ $("homeStatus").textContent = "Escribe tu nombre primero."; return; }
   $("homeStatus").textContent = "Creando tu sala…";
@@ -494,13 +562,13 @@ function hostDraw(){
   if (H.spinning || H.drawn.length >= 75) return;
   H.spinning = true; renderHostAll();
   publish(roomTopic(H.code, H.secret), { t: "spin", from: "host" });
-  spinCage("host", true); speak("Girando el biombo");
+  spinCage("host", true); spinSound(2300); speak("Girando el biombo");
   setTimeout(() => {
     const rest = []; for (let n = 1; n <= 75; n++) if (!H.drawnSet.has(n)) rest.push(n);
     const n = rest[Math.floor(Math.random()*rest.length)];
     H.drawn.push(n); H.drawnSet.add(n); H.spinning = false;
     publish(roomTopic(H.code, H.secret), { t: "draw", from: "host", n, drawn: H.drawn });
-    spinCage("host", false); setBall("host", n); renderHostAll();
+    spinCage("host", false); setBall("host", n); ballThunk(); renderHostAll();
     speak(letterOf(n) + ", " + numWord(n));
   }, 2300);
 }
@@ -522,6 +590,7 @@ function hostClose(){
 /* ================= INVITADO ================= */
 const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null, pattern: "linea" };
 function joinRoom(){
+  ensureAudio();
   myName = $("inpName").value.trim();
   const code = $("inpCode").value.trim().toUpperCase();
   if (!myName){ $("homeStatus").textContent = "Escribe tu nombre primero."; return; }
@@ -564,9 +633,9 @@ function guestOnState(msg){
   $("homeStatus").textContent = "";
 }
 function guestOnRoom(msg){
-  if (msg.t === "spin"){ spinCage("guest", true); }
+  if (msg.t === "spin"){ spinCage("guest", true); spinSound(2300); }
   if (msg.t === "draw"){
-    spinCage("guest", false);
+    spinCage("guest", false); ballThunk();
     G.drawn = Array.isArray(msg.drawn) && msg.drawn.length >= G.drawn.length ? msg.drawn : G.drawn.concat(msg.n);
     G.drawnSet = new Set(G.drawn);
     setBall("guest", msg.n); renderGuestAll(); speak(letterOf(msg.n) + ", " + numWord(msg.n));
