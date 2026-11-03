@@ -8,12 +8,12 @@
 const log = document.getElementById('log');
 const lines = [];
 function say(s){ lines.push(s); log.innerHTML = lines.join('<br>'); }
-const URL = 'https://urhptjjafebeeakasoed.supabase.co';
-const KEY = 'sb_publishable_HW8-tEUvg6ueqeob1uALLA_GLqYhMIf';
+const SBURL = 'https://urhptjjafebeeakasoed.supabase.co';
+const SBKEY = 'sb_publishable_HW8-tEUvg6ueqeob1uALLA_GLqYhMIf';
 const topic = 'bnv1-sb-probe-' + Math.random().toString(36).slice(2, 8);
 try {
-  const A = window.supabase.createClient(URL, KEY);
-  const B = window.supabase.createClient(URL, KEY);
+  const A = window.supabase.createClient(SBURL, SBKEY);
+  const B = window.supabase.createClient(SBURL, SBKEY);
   const chA = A.channel(topic, { config: { broadcast: { self: false } } });
   chA.on('broadcast', { event: 'm' }, msg => {
     if (msg.payload && msg.payload.t === 'probe') say('✅ MENSAJE RECIBIDO por el otro cliente: ' + JSON.stringify(msg.payload));
