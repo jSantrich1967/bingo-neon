@@ -311,14 +311,20 @@ function checkPattern(card, drawnSet, key){
 /* ---------- voz ---------- */
 function speak(text){
   try {
+    speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "es-ES"; u.rate = 0.95;
+    u.lang = "es-ES"; u.rate = 0.92; u.volume = 1;
     const v = speechSynthesis.getVoices().find(x => /^es/i.test(x.lang));
     if (v) u.voice = v;
     speechSynthesis.speak(u);
   } catch(e){}
 }
 if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
+let speakTimer = null;
+function speakBall(text){
+  clearTimeout(speakTimer);
+  speakTimer = setTimeout(() => speak(text), 950);
+}
 /* ---------- sonido del biombo (WebAudio, sin archivos) ---------- */
 let AC = null, masterGain = null;
 function ensureAudio(){
@@ -624,7 +630,7 @@ function hostDraw(){
     H.drawn.push(n); H.drawnSet.add(n); H.spinning = false;
     publish(roomTopic(H.code, H.secret), { t: "draw", from: "host", n, drawn: H.drawn });
     spinCage("host", false); setBall("host", n); fantasySound(); renderHostAll();
-    speak(letterOf(n) + ", " + numWord(n));
+    speakBall(letterOf(n) + ", " + numWord(n));
     if (H.auto && !H.won && H.drawn.length < 75){
       clearTimeout(H.autoTimer);
       H.autoTimer = setTimeout(() => { if (H.auto && !H.won) hostDraw(); }, H.autoDelay);
@@ -699,7 +705,7 @@ function guestOnRoom(msg){
     spinCage("guest", false); fantasySound();
     G.drawn = Array.isArray(msg.drawn) && msg.drawn.length >= G.drawn.length ? msg.drawn : G.drawn.concat(msg.n);
     G.drawnSet = new Set(G.drawn);
-    setBall("guest", msg.n); renderGuestAll(); speak(letterOf(msg.n) + ", " + numWord(msg.n));
+    setBall("guest", msg.n); renderGuestAll(); speakBall(letterOf(msg.n) + ", " + numWord(msg.n));
     guestStatusHit();
   }
   if (msg.t === "players"){ renderGuestPlayers(msg.names, msg.hostName); }
