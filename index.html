@@ -174,6 +174,7 @@
       </div>
       <p class="status" id="hostStatus"></p>
       <p class="conn" id="connHost">🟡 Conectando con el servidor…</p>
+      <p class="conn">📵 <b>No cierres ni minimices esta pantalla</b>: tu teléfono ES la sala. Si sales a otra app mucho rato, los jugadores no podrán entrar hasta que vuelvas aquí.</p>
       <div class="patbox">
         <div>
           <p class="secttl" style="margin:0 0 6px">Forma de ganar</p>
@@ -651,7 +652,7 @@ function createRoom(){
     }
     if (msg.t === "leave" && msg.uid){ if (H.players.delete(msg.uid)) hostBroadcastPlayers(); }
   });
-  showScreen("scrHost");
+  showScreen("scrHost"); keepAwake();
   $("hostCode").textContent = H.code;
   const link = location.origin + location.pathname + "?sala=" + H.code + "&k=" + H.secret;
   $("hostLink").textContent = link;
@@ -736,6 +737,11 @@ function hostReset(){
   publish(roomTopic(H.code, H.secret), { t: "reset", from: "host", pattern: H.pattern });
   setBall("host", null); renderHostAll();
 }
+let wakeLock = null;
+async function keepAwake(){
+  try { if ("wakeLock" in navigator){ wakeLock = await navigator.wakeLock.request("screen"); } } catch(e){}
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && H.active) keepAwake(); });
 function hostClose(){
   publish(roomTopic(H.code, H.secret), { t: "closed", from: "host" });
   clearInterval(H.heartbeat);
