@@ -388,7 +388,12 @@ function createRoom(){
     const link = location.origin + location.pathname + "?sala=" + code;
     $("hostLink").textContent = link;
     $("btnCopy").onclick = ()=>{ navigator.clipboard && navigator.clipboard.writeText(link); $("btnCopy").textContent = "✅ ¡Enlace copiado!"; setTimeout(()=>$("btnCopy").textContent = "📋 Copiar enlace de invitación", 2000); };
-    try{ QRCode.toCanvas(link, {width:168, margin:1}, (err, canvas)=>{ if(!err){ const q = $("qr"); q.innerHTML=""; q.appendChild(canvas); } }); }catch(e){}
+    try{
+      const canvas = document.createElement("canvas");
+      QRCode.toCanvas(canvas, link, {width:176, margin:1}, err=>{
+        if (!err){ const q = $("qr"); q.innerHTML=""; q.appendChild(canvas); }
+      });
+    }catch(e){}
     renderCage($("cageHost"));
     hostSyncPlayers(); hostRenderAll();
     speak("Sala creada. Código " + code.split("").join(" "));
