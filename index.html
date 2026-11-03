@@ -560,8 +560,12 @@ function randSecret(){ const A = "abcdefghjkmnpqrstuvwxyz23456789"; let s = ""; 
 
 let myName = "";
 /* ================= ANFITRIÓN ================= */
-const H = { active: false, code: "", secret: "", players: new Map(), drawn: [], drawnSet: new Set(), spinning: false, won: false, myCard: null, heartbeat: null, pattern: "linea", auto: false, autoTimer: null, autoDelay: 7000 };
+const H = { active: false, code: "", secret: "", players: new Map(), drawn: [], drawnSet: new Set(), spinning: false, won: false, myCard: null, heartbeat: null, pattern: "linea", announced: false, auto: false, autoTimer: null, autoDelay: 7000 };
 function hostNames(){ return Array.from(H.players.values()).map(p => p.name); }
+function hostAnnounce(text){
+  speak(text);
+  publish(roomTopic(H.code, H.secret), { t: "announce", from: "host", text });
+}
 function hostBroadcastPlayers(){ publish(roomTopic(H.code, H.secret), { t: "players", from: "host", names: hostNames(), hostName: myName }); renderHostPlayers(); }
 function hostSendState(uid){
   const p = H.players.get(uid); if (!p) return;
@@ -639,9 +643,14 @@ function renderHostAll(){
 }
 function hostDraw(){
   if (H.spinning || H.drawn.length >= 75) return;
+  let announcing = false;
+  if (!H.announced && H.drawn.length === 0){
+    H.announced = true; announcing = true;
+    hostAnnounce("¡Comenzamos el juego! Hoy se gana con " + PATTERNS[H.pattern].name + ". ¡Suerte a todos!");
+  }
   H.spinning = true; renderHostAll();
   publish(roomTopic(H.code, H.secret), { t: "spin", from: "host" });
-  spinCage("host", true); spinSound(2300); speak("Girando el biombo");
+  spinCage("host", true); spinSound(2300); if (!announcing) speak("Girando el biombo");
   setTimeout(() => {
     const rest = []; for (let n = 1; n <= 75; n++) if (!H.drawnSet.has(n)) rest.push(n);
     const n = rest[Math.floor(Math.random()*rest.length)];
@@ -662,6 +671,7 @@ function hostOnWinner(name, big, patternName){
 }
 function hostReset(){
   if (H.auto) setAuto(false);
+  H.announced = false;
   H.drawn = []; H.drawnSet = new Set(); H.won = false; winnerHide();
   H.players.forEach((p, uid) => { p.card = genCard(); if (uid === myUid) H.myCard = p.card; else publish(userTopic(uid), { t: "newcard", card: p.card }); });
   publish(roomTopic(H.code, H.secret), { t: "reset", from: "host", pattern: H.pattern });
@@ -673,7 +683,7 @@ function hostClose(){
   setTimeout(() => location.href = location.origin + location.pathname, 400);
 }
 /* ================= INVITADO ================= */
-const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null, pattern: "linea" };
+const G = { code: "", secret: "", card: null, drawn: [], drawnSet: new Set(), hostName: "", joined: false, knockTimer: null, helloTimer: null, joinTimeout: null, pattern: "linea", joinedAnnounced: false };
 function joinRoom(){
   ensureAudio();
   myName = $("inpName").value.trim();
@@ -708,6 +718,10 @@ function guestOnState(msg){
   if (msg.pattern && PATTERNS[msg.pattern]){ G.pattern = msg.pattern; guestShowPattern(); }
   G.drawn = msg.drawn || []; G.drawnSet = new Set(G.drawn);
   G.joined = true; clearTimeout(G.joinTimeout); clearInterval(G.helloTimer); clearInterval(G.knockTimer);
+  if (!G.joinedAnnounced){
+    G.joinedAnnounced = true;
+    if (!G.drawn.length) setTimeout(() => speak("Te uniste a la sala de " + G.hostName + ". Se gana con " + PATTERNS[G.pattern].name + "."), 600);
+  }
   $("guestCode").textContent = G.code;
   $("guestHost").textContent = G.hostName;
   $("guestNameLbl").textContent = myName;
@@ -718,6 +732,7 @@ function guestOnState(msg){
   $("homeStatus").textContent = "";
 }
 function guestOnRoom(msg){
+  if (msg.t === "announce" && msg.text){ speak(msg.text); }
   if (msg.t === "spin"){ spinCage("guest", true); spinSound(2300); }
   if (msg.t === "draw"){
     spinCage("guest", false); fantasySound();
@@ -729,6 +744,7 @@ function guestOnRoom(msg){
   if (msg.t === "players"){ renderGuestPlayers(msg.names, msg.hostName); }
   if (msg.t === "pattern" && PATTERNS[msg.pattern]){
     G.pattern = msg.pattern; guestShowPattern();
+    speak("Nueva partida. Se gana con " + PATTERNS[msg.pattern].name + ".");
     $("guestStatus").innerHTML = "🎯 Nueva forma de ganar: <b>" + PATTERNS[msg.pattern].name + "</b>. ¡Nueva partida!";
   }
   if (msg.t === "winner"){
@@ -784,6 +800,7 @@ $("selPattern").addEventListener("change", () => {
   H.pattern = $("selPattern").value;
   publish(roomTopic(H.code, H.secret), { t: "pattern", from: "host", pattern: H.pattern });
   hostReset();
+  speak("Nueva partida. Se gana con " + PATTERNS[H.pattern].name + ". ¡Suerte a todos!");
   $("hostStatus").innerHTML = "🎯 Forma de ganar: <b>" + PATTERNS[H.pattern].name + "</b>. Partida nueva para todos.";
 });
 function setAuto(on){

@@ -25,7 +25,7 @@ function makePhone() {
   const w = dom.window;
   w.WebSocket = FakeWS;
   w.fetch = fakeFetch;
-  w.speechSynthesis = { getVoices: () => [], speak: () => {} };
+  w.speechSynthesis = { getVoices: () => [], cancel: () => {}, speak: (u) => { (w.__said = w.__said || []).push(u.text); } };
   w.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
   w.scrollTo = () => {};
   return w;
@@ -103,6 +103,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   host.document.getElementById('btnModeManual').click();
   await sleep(9000);
   check(guest.document.getElementById('guestCount').textContent === '2/75', 'al pasar a MANUAL el automático se detiene (sigue ' + guest.document.getElementById('guestCount').textContent + ')');
+
+
+  // --- Anuncio de la forma al comenzar y al entrar ---
+  check((guest.__said || []).some(t => /Se gana con/.test(t)), 'ANUNCIO: el invitado oyó con qué se gana al entrar/comenzar: ' + JSON.stringify(guest.__said || []));
+  check((host.__said || []).some(t => /Se gana con|Comenzamos/.test(t)), 'ANUNCIO: el anfitrión anunció la forma: ' + JSON.stringify(host.__said || []));
 
   const fails = results.filter(r => !r).length;
   console.log(fails === 0 ? '\nSMOKE TODO OK' : '\nSMOKE CON ' + fails + ' FALLOS');
