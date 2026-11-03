@@ -46,40 +46,59 @@
   .players li{display:flex; align-items:center; gap:8px; padding:9px 12px; background:#0d0d24; border:1px solid var(--line); border-radius:10px; margin:6px 0; font-size:16px}
   .dot{width:9px; height:9px; border-radius:50%; background:#52ffa8; box-shadow:0 0 8px #52ffa8; flex:none}
   .tag{margin-left:auto; font-size:11px; color:#0b0b20; background:var(--o); padding:2px 8px; border-radius:99px; font-weight:800}
-  /* Biombo */
-  .cage-zone{display:flex; flex-direction:column; align-items:center; padding:12px 2px !important}
-  .cage{position:relative; width:min(480px,92vw); height:min(480px,92vw); border-radius:50%; margin:8px auto 4px;
-    border:4px solid #4a4a8f; background:radial-gradient(circle at 35% 28%, rgba(150,170,255,.28), rgba(10,10,32,.94) 68%);
-    box-shadow:0 0 0 10px #141432, 0 0 60px rgba(90,80,255,.45), inset 0 0 70px rgba(0,0,0,.65), inset 0 -18px 34px rgba(0,0,0,.5); overflow:hidden}
-  .cage .bars{position:absolute; inset:0; border-radius:50%; z-index:3; pointer-events:none;
-    background:
-      repeating-conic-gradient(from 0deg, transparent 0deg 13deg, rgba(205,215,255,.38) 13deg 15.5deg),
-      repeating-conic-gradient(from 7deg, transparent 0deg 44deg, rgba(205,215,255,.16) 44deg 47deg);
-    animation:barsrotate 26s linear infinite}
-  .cage .bars::after{content:""; position:absolute; inset:9%; border-radius:50%; border:3px solid rgba(205,215,255,.30);
-    box-shadow:inset 0 0 0 2px rgba(0,0,0,.25), 0 0 0 2px rgba(0,0,0,.15)}
+  /* Biombo: jaula esférica de alambre negro, como el de verdad */
+  .cage-zone{display:flex; flex-direction:column; align-items:center; padding:12px 2px !important; overflow:visible}
+  .cageWrap{display:flex; flex-direction:column; align-items:center}
+  .cageBox{position:relative; width:min(450px,84vw); aspect-ratio:1; z-index:2}
+  .cage{position:relative; width:100%; height:100%; border-radius:50%;
+    border:5px solid #0b0b11; background:radial-gradient(circle at 38% 30%, #434a58, #1a1c24 60%, #0a0a0f 100%);
+    box-shadow:0 0 0 3px #23232e, 0 18px 34px rgba(0,0,0,.55), inset 0 0 60px rgba(0,0,0,.7), inset 0 -22px 38px rgba(0,0,0,.55); overflow:hidden}
+  .cage .mesh{position:absolute; inset:0; z-index:3; pointer-events:none; animation:barsrotate 34s linear infinite}
+  .cage .mesh svg{width:100%; height:100%; display:block}
+  .cage.spin .mesh{animation:barsrotate .8s linear infinite}
   .cage .shine{position:absolute; inset:0; border-radius:50%; z-index:4; pointer-events:none;
-    background:radial-gradient(circle at 30% 20%, rgba(255,255,255,.20), rgba(255,255,255,0) 42%)}
+    background:radial-gradient(circle at 30% 18%, rgba(255,255,255,.13), rgba(255,255,255,0) 40%)}
   .cage .balls{position:absolute; inset:0; z-index:2}
-  .cage.spin .bars{animation:barsrotate .55s linear infinite}
-
   @keyframes barsrotate{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  @keyframes cagespin{from{transform:rotate(0)}to{transform:rotate(-360deg)}}
-  .cagebase{width:56%; height:20px; margin:0 auto; border-radius:50%; background:radial-gradient(ellipse at center, rgba(0,0,0,.65), rgba(0,0,0,0) 70%)}
+  @keyframes crankspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .axle{position:absolute; left:-6%; right:-6%; top:50%; height:11px; transform:translateY(-50%); z-index:5;
+    background:linear-gradient(#3d3d49, #101016 55%, #26262f); border-radius:6px; box-shadow:0 3px 7px rgba(0,0,0,.6)}
+  .crank{position:absolute; right:-42px; top:50%; width:46px; height:46px; transform:translateY(-50%); z-index:6}
+  .crankRot{position:absolute; inset:0}
+  .crankRot::before{content:""; position:absolute; left:50%; top:50%; width:15px; height:15px; transform:translate(-50%,-50%);
+    border-radius:50%; background:radial-gradient(circle at 35% 30%, #4a4a58, #0c0c12); box-shadow:0 2px 5px rgba(0,0,0,.6)}
+  .crankArm{position:absolute; left:50%; top:50%; width:19px; height:7px; transform:translateY(-50%);
+    background:#17171f; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,.5)}
+  .crankGrip{position:absolute; left:calc(50% + 17px); top:50%; width:25px; height:13px; transform:translate(-50%,-50%);
+    border-radius:7px; background:linear-gradient(#3a3a46, #0b0b10 60%); box-shadow:0 3px 6px rgba(0,0,0,.65)}
+  .cageWrap:has(.cage.spin) .crankRot{animation:crankspin .8s linear infinite}
+  .stand{position:relative; width:min(450px,84vw); height:52px; margin-top:-30px; z-index:1}
+  .stand .leg{position:absolute; bottom:9px; width:11px; height:54px; border-radius:6px;
+    background:linear-gradient(#2c2c37, #0b0b10); box-shadow:0 3px 6px rgba(0,0,0,.5)}
+  .stand .legL{left:17%; transform:rotate(23deg); transform-origin:bottom center}
+  .stand .legR{right:17%; transform:rotate(-23deg); transform-origin:bottom center}
+  .stand .basebar{position:absolute; bottom:0; left:2%; right:2%; height:11px; border-radius:6px;
+    background:linear-gradient(#34343f, #0a0a10); box-shadow:0 12px 20px rgba(0,0,0,.55)}
   .mini{position:absolute; width:13.5%; aspect-ratio:1; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    box-shadow:inset -6px -9px 14px rgba(0,0,0,.45), inset 4px 6px 10px rgba(255,255,255,.35), 0 5px 10px rgba(0,0,0,.5)}
-  .mini .nb{background:radial-gradient(circle at 38% 32%, #ffffff, #dfe3ee 78%); color:#191930; border-radius:50%;
-    width:64%; height:64%; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:clamp(11px,3.6vw,19px);
-    box-shadow:inset 0 -2px 4px rgba(0,0,0,.22), 0 1px 2px rgba(0,0,0,.3)}
+    box-shadow:inset -7px -11px 16px rgba(0,0,0,.55), inset 3px 5px 9px rgba(255,255,255,.30), 0 5px 10px rgba(0,0,0,.5)}
+  .mini::after{content:""; position:absolute; left:14%; top:7%; width:36%; height:27%; border-radius:50%; pointer-events:none;
+    background:radial-gradient(ellipse at center, rgba(255,255,255,.95), rgba(255,255,255,0) 70%); transform:rotate(-18deg)}
+  .mini .nb{background:radial-gradient(circle at 42% 34%, #ffffff, #e8eaf2 80%); color:#101018; border-radius:50%;
+    width:66%; height:66%; display:flex; align-items:center; justify-content:center; font-family:Georgia, 'Times New Roman', serif; font-weight:700; font-size:clamp(11px,3.6vw,19px);
+    box-shadow:inset 0 -2px 4px rgba(0,0,0,.25), 0 1px 2px rgba(0,0,0,.3)}
   .bigball{width:min(200px,54vw); height:min(200px,54vw); border-radius:50%; margin:14px auto 2px; display:flex; align-items:center; justify-content:center;
     background:#23233f; border:3px solid var(--line); color:var(--muted); transition:transform .15s;
     box-shadow:inset -12px -18px 30px rgba(0,0,0,.5), inset 8px 12px 22px rgba(255,255,255,.28), 0 14px 28px rgba(0,0,0,.55)}
-  .bigball .bbadge{background:radial-gradient(circle at 38% 30%, #ffffff, #dde1ee 80%); border-radius:50%; width:68%; height:68%;
+  .bigball{position:relative; overflow:hidden}
+  .bigball::after{content:""; position:absolute; left:13%; top:6%; width:38%; height:28%; border-radius:50%; pointer-events:none;
+    background:radial-gradient(ellipse at center, rgba(255,255,255,.9), rgba(255,255,255,0) 70%); transform:rotate(-18deg)}
+  .bigball .bbadge{background:radial-gradient(circle at 42% 32%, #ffffff, #e8eaf2 80%); border-radius:50%; width:68%; height:68%;
     display:flex; flex-direction:column; align-items:center; justify-content:center; color:#191930;
     box-shadow:inset 0 -4px 8px rgba(0,0,0,.20), 0 2px 5px rgba(0,0,0,.30)}
   .bigball.pop{animation:pop .45s ease}
   @keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
   .bigball .bl{font-size:24px; font-weight:900; letter-spacing:4px; line-height:1}
+  .bigball .bn{font-family:Georgia, 'Times New Roman', serif}
   .bigball .bn{font-size:66px; font-weight:900; line-height:1.02}
   .ballword{text-align:center; font-size:17px; color:var(--txt); min-height:24px; margin:4px 0 0; font-weight:600}
   /* Formas de ganar */
@@ -154,7 +173,7 @@
 
     <div class="card cage-zone">
       <p class="secttl">Biombo</p>
-      <div class="cage" id="cageHost"></div>
+      <div class="cageWrap"><div class="cageBox"><div class="cage" id="cageHost"></div><div class="axle"></div><div class="crank"><div class="crankRot"><div class="crankArm"></div><div class="crankGrip"></div></div></div></div><div class="stand"><div class="leg legL"></div><div class="leg legR"></div><div class="basebar"></div></div></div>
       <div class="bigball" id="hostBall"><span class="bl">—</span><span class="bn">?</span></div>
       <p class="ballword" id="hostWord">Todavía no sale ninguna bola</p>
       <button class="btn btn-main" id="btnDraw">🌀 Girar y sacar bola</button>
@@ -216,7 +235,7 @@
   <section id="scrGuest" class="hidden">
     <div class="card cage-zone">
       <p class="secttl">Sala <span id="guestCode" style="color:var(--accent)"></span> · Anfitrión: <span id="guestHost"></span></p>
-      <div class="cage" id="cageGuest"></div>
+      <div class="cageWrap"><div class="cageBox"><div class="cage" id="cageGuest"></div><div class="axle"></div><div class="crank"><div class="crankRot"><div class="crankArm"></div><div class="crankGrip"></div></div></div></div><div class="stand"><div class="leg legL"></div><div class="leg legR"></div><div class="basebar"></div></div></div>
       <div class="bigball" id="guestBall"><span class="bl">—</span><span class="bn">?</span></div>
       <p class="ballword" id="guestWord">Esperando que el anfitrión gire el biombo…</p>
       <p class="status" id="guestStatus"></p>
@@ -462,7 +481,17 @@ function shade(hex, f){
   return "rgb(" + r + "," + g + "," + b + ")";
 }
 function ballBg(hex){
-  return "radial-gradient(circle at 32% 26%, " + shade(hex, .75) + " 0%, " + shade(hex, .25) + " 30%, " + hex + " 58%, " + shade(hex, -.45) + " 100%)";
+  return "radial-gradient(circle at 32% 26%, " + shade(hex, .88) + " 0%, " + shade(hex, .38) + " 26%, " + hex + " 56%, " + shade(hex, -.52) + " 100%)";
+}
+function meshSVG(uid){
+  const mer = [12, 24, 35, 44].map(rx => '<ellipse cx="50" cy="50" rx="' + rx + '" ry="49"/>').join("");
+  const par = [-34, -20, 0, 20, 34].map(dy => { const rx = Math.sqrt(49 * 49 - dy * dy).toFixed(1); return '<ellipse cx="50" cy="' + (50 + dy) + '" rx="' + rx + '" ry="' + (rx * 0.22).toFixed(1) + '"/>'; }).join("");
+  return '<svg viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'
+    + '<defs><clipPath id="mc' + uid + '"><circle cx="50" cy="50" r="49"/></clipPath></defs>'
+    + '<g clip-path="url(#mc' + uid + ')" fill="none" stroke="#0a0a12" stroke-width="1.5">' + mer + par
+    + '<g transform="rotate(45 50 50)">' + mer + '</g><g transform="rotate(-45 50 50)">' + mer + '</g></g>'
+    + '<circle cx="50" cy="50" r="49" fill="none" stroke="#0a0a12" stroke-width="2.6"/>'
+    + '<circle cx="50" cy="50" r="3.6" fill="#0a0a12"/></svg>';
 }
 /* Física sencilla del biombo: gravedad, choques entre bolas y con la pared de la esfera.
    En reposo las bolas caen y se apilan al fondo; al girar, una corriente las revuelca. */
@@ -489,9 +518,9 @@ function renderCage(el, drawnSet){
       y: 10 + Math.floor(i / cols) * 12 + (Math.random() - .5) * 4,
       vx: (Math.random() - .5) * 14, vy: Math.random() * 8 });
   }
-  const bars = document.createElement("div"); bars.className = "bars";
+  const mesh = document.createElement("div"); mesh.className = "mesh"; mesh.innerHTML = meshSVG(el.id || "cage");
   const shine = document.createElement("div"); shine.className = "shine";
-  el.appendChild(balls); el.appendChild(bars); el.appendChild(shine);
+  el.appendChild(balls); el.appendChild(mesh); el.appendChild(shine);
   cageSims.set(el, sim);
   const R = 6.75, RLIM = 43.2, GRAV = 300, REST = 0.42;
   function step(now){
