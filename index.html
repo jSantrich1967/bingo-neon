@@ -95,6 +95,7 @@
   select{width:100%; padding:11px; border-radius:10px; border:1px solid var(--line); background:#0b0b20; color:var(--txt); font-size:15px; font-weight:700; outline:none}
   .modebtn.active{background:linear-gradient(90deg,#2257ff,#8a3ffc); color:#fff; border-color:transparent; box-shadow:0 6px 18px rgba(90,60,255,.35)}
   .autorow{display:flex; align-items:center; gap:10px; margin-top:10px; font-size:14px; color:var(--muted)}
+  .conn{font-size:12.5px; color:var(--muted); margin:6px 0 0}
   .cell.pat{box-shadow:0 0 0 2px var(--o), 0 0 10px rgba(255,201,77,.45)}
   /* Cartón */
   .cardgrid{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:10px}
@@ -172,6 +173,7 @@
         </select>
       </div>
       <p class="status" id="hostStatus"></p>
+      <p class="conn" id="connHost">🟡 Conectando con el servidor…</p>
       <div class="patbox">
         <div>
           <p class="secttl" style="margin:0 0 6px">Forma de ganar</p>
@@ -219,6 +221,7 @@
       <div class="bigball" id="guestBall"><span class="bl">—</span><span class="bn">?</span></div>
       <p class="ballword" id="guestWord">Esperando que el anfitrión gire el biombo…</p>
       <p class="status" id="guestStatus"></p>
+      <p class="conn" id="connGuest">🟡 Conectando con el servidor…</p>
       <div class="patbox">
         <div>
           <p class="secttl" style="margin:0 0 6px">Se gana con</p>
@@ -526,26 +529,69 @@ const seenMids = new Set();
 let midCounter = 0;
 function newMid(){ return myUid + "-" + (++midCounter) + "-" + Math.random().toString(36).slice(2, 7); }
 const subs = new Map();
+function setConn(ok){
+  ["connHost", "connGuest"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = ok ? "🟢 Conectado con el servidor" : "🟡 Conectando con el servidor…";
+  });
+}
+function deliverMsg(s, data){
+  if (!data || data.event !== "message" || !data.message) return;
+  let msg; try { msg = JSON.parse(data.message); } catch(e){ return; }
+  if (!msg || !msg.t || !msg.mid) return;
+  if (seenMids.has(msg.mid)) return;
+  seenMids.add(msg.mid); if (seenMids.size > 800) seenMids.clear();
+  s.handlers.forEach(h => { try { h(msg); } catch(e){} });
+}
 function subscribe(topic, handler){
   let s = subs.get(topic);
-  if (!s){ s = { handlers: new Set(), ws: null, closed: false }; subs.set(topic, s); connectSub(topic, s); }
+  if (!s){ s = { handlers: new Set(), ws: null, es: null, closed: false, polling: false }; subs.set(topic, s); connectSub(topic, s); }
   s.handlers.add(handler);
 }
 function connectSub(topic, s){
-  let ws;
-  try { ws = new WebSocket(RELAY_WS + topic + "/ws"); } catch(e){ setTimeout(() => { if (!s.closed) connectSub(topic, s); }, 3000); return; }
+  let ws, opened = false;
+  const openTimer = setTimeout(() => { if (!opened && !s.closed){ try { ws.close(); } catch(e){} startSSE(topic, s); } }, 6000);
+  try { ws = new WebSocket(RELAY_WS + topic + "/ws"); } catch(e){ clearTimeout(openTimer); startSSE(topic, s); return; }
   s.ws = ws;
-  ws.onmessage = ev => {
-    let data; try { data = JSON.parse(ev.data); } catch(e){ return; }
-    if (!data || data.event !== "message" || !data.message) return;
-    let msg; try { msg = JSON.parse(data.message); } catch(e){ return; }
-    if (!msg || !msg.t || !msg.mid) return;
-    if (seenMids.has(msg.mid)) return;
-    seenMids.add(msg.mid); if (seenMids.size > 800) seenMids.clear();
-    s.handlers.forEach(h => { try { h(msg); } catch(e){} });
+  ws.onopen = () => { opened = true; clearTimeout(openTimer); setConn(true); };
+  ws.onmessage = ev => { let d; try { d = JSON.parse(ev.data); } catch(e){ return; } deliverMsg(s, d); };
+  ws.onclose = () => {
+    clearTimeout(openTimer);
+    if (s.closed) return;
+    if (opened) setTimeout(() => { if (!s.closed) connectSub(topic, s); }, 2000);
+    else startSSE(topic, s);
   };
-  ws.onclose = () => { if (!s.closed) setTimeout(() => connectSub(topic, s), 2500); };
   ws.onerror = () => { try { ws.close(); } catch(e){} };
+}
+function startSSE(topic, s){
+  if (s.closed || s.es) return;
+  let es;
+  try { es = new EventSource(RELAY_HTTP + topic + "/sse"); } catch(e){ startPoll(topic, s); return; }
+  s.es = es;
+  es.onopen = () => setConn(true);
+  es.onmessage = ev => { let d; try { d = JSON.parse(ev.data); } catch(e){ return; } deliverMsg(s, d); };
+  es.onerror = () => { if (es.readyState === 2){ try { es.close(); } catch(e){} s.es = null; startPoll(topic, s); } };
+}
+function startPoll(topic, s){
+  if (s.closed || s.polling) return;
+  s.polling = true;
+  let since = Math.floor(Date.now() / 1000) - 10;
+  const tick = async () => {
+    if (s.closed){ s.polling = false; return; }
+    try {
+      const r = await fetch(RELAY_HTTP + topic + "/json?poll=1&since=" + since, { cache: "no-store" });
+      const txt = await r.text();
+      setConn(true);
+      txt.split("\n").forEach(line => {
+        if (!line.trim()) return;
+        let d; try { d = JSON.parse(line); } catch(e){ return; }
+        if (d.time) since = Math.max(since, d.time);
+        deliverMsg(s, d);
+      });
+    } catch(e){}
+    setTimeout(tick, 2500);
+  };
+  tick();
 }
 function publish(topic, msg){
   msg.mid = newMid();
@@ -718,7 +764,7 @@ function joinRoom(){
   }
   clearTimeout(G.joinTimeout);
   G.joinTimeout = setTimeout(() => {
-    if (!G.joined){ clearInterval(G.knockTimer); clearInterval(G.helloTimer); $("homeStatus").textContent = "No se encontró esa sala. Revisa el código o pide el enlace de invitación."; }
+    if (!G.joined) $("homeStatus").innerHTML = "⏳ Sigo intentando entrar a la sala " + G.code + "… El anfitrión debe tener su pantalla de la sala <b>abierta y visible</b>. En cuanto la abra, entras solo.";
   }, 45000);
 }
 function enterRoom(){
@@ -803,6 +849,12 @@ function guestBingo(){
   publish(roomTopic(G.code, G.secret), { t: "bingo", uid: myUid, name: myName });
   $("bingoMsg").textContent = "Revisando tu bingo…";
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (H.active){ publish(roomTopic(H.code, H.secret), { t: "names", from: "host", names: hostNames() }); hostSendStateAll(); }
+  if (G.code && G.secret && !G.joined) publish(roomTopic(G.code, G.secret), { t: "hello", uid: myUid, name: myName });
+  else if (G.code && !G.secret) publish(lobbyTopic(G.code), { t: "knock", uid: myUid, name: myName });
+});
 function guestLeave(){
   if (G.code && G.secret) publish(roomTopic(G.code, G.secret), { t: "leave", uid: myUid });
   setTimeout(() => location.href = location.origin + location.pathname, 300);
