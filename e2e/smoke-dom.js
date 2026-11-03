@@ -44,8 +44,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const code = host.document.getElementById('hostCode').textContent.trim();
   check(/^[A-Z0-9]{6}$/.test(code), 'código de sala: ' + code);
   check(host.document.getElementById('hostPCount').textContent === '1', 'anfitrión se cuenta como 1 jugador');
-  const qrImg = host.document.querySelector('#qr img');
-  check(!!qrImg && qrImg.src.includes('api.qrserver.com'), 'QR visible como imagen');
+  const qrSvg = host.document.querySelector('#qr svg');
+  check(!!qrSvg, 'QR generado localmente como SVG (sin depender de servicios externos)');
 
   const guest = makePhone();
   await sleep(300);
