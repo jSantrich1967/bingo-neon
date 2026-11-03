@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><title>Prueba MQTT</title></head>
+<body style="font-family:monospace; background:#111; color:#eee; padding:16px">
+<h3>Prueba de brokers MQTT con la librería oficial mqtt.js</h3>
+<div id="log">cargando librería…</div>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+const log = document.getElementById('log');
+const lines = [];
+function say(s){ lines.push(s); log.innerHTML = lines.join('<br>'); }
+if (typeof mqtt === 'undefined'){ say('ERROR: la librería mqtt.js no cargó'); }
+else {
+  say('librería OK, probando brokers…');
+  const brokers = [
+    'wss://mqtt.eclipseprojects.io:443/mqtt',
+    'wss://broker.emqx.io:8084/mqtt',
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://test.mosquitto.org:8081/mqtt'
+  ];
+  brokers.forEach(url => {
+    const t0 = Date.now();
+    let done = false;
+    try {
+      const c = mqtt.connect(url, { clientId: 'probe-' + Math.random().toString(36).slice(2,9), connectTimeout: 9000, reconnectPeriod: 0 });
+      c.on('connect', () => { if (!done){ done = true; say('✅ CONECTÓ ' + url + ' en ' + (Date.now()-t0) + ' ms'); c.end(true); } });
+      c.on('error', e => { if (!done){ done = true; say('❌ ERROR ' + url + ' :: ' + (e && e.message)); } });
+      setTimeout(() => { if (!done){ done = true; say('⏰ TIMEOUT ' + url); try { c.end(true); } catch(e){} } }, 11000);
+    } catch(e){ say('❌ EXCEPCIÓN ' + url + ' :: ' + e.message); }
+  });
+}
+</script>
+</body></html>
