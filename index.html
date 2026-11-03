@@ -710,6 +710,7 @@ function hostAnnounce(text){
   publish(roomTopic(H.code, H.secret), { t: "announce", from: "host", text });
 }
 function hostBroadcastPlayers(){ publish(roomTopic(H.code, H.secret), { t: "players", from: "host", names: hostNames(), hostName: myName }); renderHostPlayers(); }
+function hostSendStateAll(){ H.players.forEach((p, uid) => { if (uid !== myUid) hostSendState(uid); }); }
 function hostSendState(uid){
   const p = H.players.get(uid); if (!p) return;
   publish(userTopic(uid), { t: "state", card: p.card, drawn: H.drawn, hostName: myName, code: H.code, names: hostNames(), pattern: H.pattern });
